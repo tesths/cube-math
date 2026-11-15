@@ -23,6 +23,7 @@ const els = {
   status: $('status'),
   statusText: $('statusText'),
   actionBtn: $('actionBtn'),
+  toolStep: $('toolStep'),
   resetBtn: $('resetBtn'),
   taskTabs: $('taskTabs'),
   toolTip: $('toolTip'),
@@ -30,6 +31,8 @@ const els = {
   scene: $('scene'),
   cubeCount: $('cubeCount'),
   placingHint: $('placingHint'),
+  guideChip: $('guideChip'),
+  guideToast: $('guideToast'),
   kbHint: $('kbHint'),
   showViews: $('showViews'),
   orbitPad: $('orbitPad'),
@@ -59,13 +62,22 @@ const app = {
 };
 
 const TOOL_TIPS = {
-  move: '打开「移动」后，点中一块再点目标格子就能挪过去；也可以直接拖动。「重置」回到这个任务最初的样子。',
-  erase: '打开「拿走」后，点任意方块就把它拿走，上面的方块会自动落下。「重置」回到这个任务最初的样子。',
-  place: '打开「添上」后，点方块顶面或空格子就能加一块。「重置」回到这个任务最初的样子。',
+  move: '先点「移动木块」按钮，才能点木块；点中一块再点目标格子就能挪过去，也可以直接拖动。「重置木块」回到这个任务最初的样子。',
+  erase: '先点「拿走木块」按钮，才能点木块；点任意木块就把它拿走，上面的木块会自动落下。「重置木块」回到这个任务最初的样子。',
+  place: '先点「添上木块」按钮，才能加木块；点木块顶面或空格子就能添一块，再点一次按钮或按 Esc 结束。「重置木块」回到这个任务最初的样子。',
 };
 
+/** 两步引导：没点亮工具时提示「先点按钮」，点亮后提示「现在怎么操作」 */
+const GUIDES = {
+  move:  { idle: '① 先点左边「移动木块」按钮',   active: '② 点中一块，再点目标格子（或直接拖动）' },
+  erase: { idle: '① 先点左边「拿走木块」按钮',   active: '② 点任意木块，就把它拿走' },
+  place: { idle: '① 先点「添上木块」按钮',       active: '② 点木块顶面或空格子，就能添一块' },
+};
+
+let guideTimer = null;
+
 const KB_TIPS = {
-  move: '方向键选格子 · 回车把选中的方块挪过去',
+  move: '方向键选格子 · 回车把选中的木块挪过去',
   erase: '方向键选格子 · Delete 拿走那一列最上面一块',
   place: '方向键选格子 · 回车添一块',
 };
@@ -123,6 +135,26 @@ function setStatus(state, text) {
 
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString('zh-CN', { hour12: false });
+}
+
+/** 没先点工具按钮就点木块 / 按键盘：弹一条提醒，并把按钮再闪一下 */
+function showGuideReminder(message) {
+  const label = taskMeta(app.task).actionLabel;
+  els.guideToast.textContent = message ?? `先点左边的「${label}」按钮，再操作木块`;
+  els.guideToast.hidden = false;
+
+  els.actionBtn.classList.remove('nudge');
+  void els.actionBtn.offsetWidth;      // 强制重排，让动画每次都能重新播放
+  els.actionBtn.classList.add('nudge');
+  clearTimeout(guideTimer);
+  guideTimer = setTimeout(hideGuideReminder, 2600);
+}
+
+function hideGuideReminder() {
+  clearTimeout(guideTimer);
+  guideTimer = null;
+  els.guideToast.hidden = true;
+  els.actionBtn.classList.remove('nudge');
 }
 
 /**
@@ -240,11 +272,15 @@ function initWorkspace() {
       app.stage.setSelected(to);   // 挪完继续选中新位置，便于连续调整
     },
     onDelete: (pos) => commit(app.cubes.filter((c) => key(c) !== key(pos))),
-    onPlacingChange: () => { /* 没有放置模式了 */ },
+    onPlacingChange: () => { /* 放置状态由 app.mode 驱动，界面在 syncModeButtons 里同步 */ },
     onKeyboardModeChange: (on) => {
       els.kbHint.hidden = !on;
     },
+    onLockedClick: () => showGuideReminder(),
   });
+
+  // 调试入口：在 DevTools 控制台敲 cubeView() 会打印并返回当前视角角度、允许范围
+  window.cubeView = () => app.stage?.logView();
 
   app.panel = new ViewPanel({
     btn: els.showViews,
@@ -253,11 +289,11 @@ function initWorkspace() {
     footEl: els.viewFoot,
   });
 
-  // 平板没有右键：视角球负责转视角，「复位」按钮负责回正（两件事分开，学生不容易误触）
+  // 平板没有右键：视角球负责转视角，「复位视角」按钮负责回正（两件事分开，学生不容易误触）
   app.stage.attachOrbitPad(els.orbitPad);
   els.resetView.addEventListener('click', () => app.stage.resetView());
 
-  // 左侧只有一个动作按钮，内容随任务变化：移动 / 拿走 / 添上
+  // 左侧动作按钮，内容随任务变化：移动木块 / 拿走木块 / 添上木块；再点一次收起工具
   els.actionBtn.addEventListener('click', () => {
     const action = taskMeta(app.task).action;
     setMode(app.mode === action ? 'none' : action);
@@ -288,10 +324,6 @@ function initWorkspace() {
   });
 }
 
-/**
- * 小方块 / 橡皮擦互斥：同一时刻只有一个工具生效。
- * 之前两个按钮各管各的，同时点亮是可能的，学生也会困惑"现在到底在放还是在删"。
- */
 /** 三个工具互斥：同一时刻只有一个生效（move / erase / place） */
 function setMode(mode) {
   app.mode = mode;
@@ -304,11 +336,20 @@ function setMode(mode) {
 
 function syncModeButtons() {
   const action = taskMeta(app.task).action;
-  els.actionBtn.setAttribute('aria-pressed', String(app.mode === action));
+  const active = app.mode === action;
+  els.actionBtn.setAttribute('aria-pressed', String(active));
   els.stage.dataset.moving = String(app.mode === 'move');
   els.stage.dataset.erasing = String(app.mode === 'erase');
   els.stage.dataset.placing = String(app.mode === 'place');
   els.placingHint.hidden = app.mode !== 'place';
+
+  // 引导跟着工具状态变：没点亮 → 一直提示"先点按钮"并让按钮呼吸；点亮 → 换成"怎么操作"
+  const guide = GUIDES[action];
+  els.toolStep.textContent = active ? '② 现在到舞台里操作木块' : '① 先点下面的按钮';
+  els.guideChip.textContent = active ? guide.active : guide.idle;
+  els.guideChip.classList.toggle('is-idle', !active);
+  els.actionBtn.classList.toggle('is-idle', !active);
+  if (active) hideGuideReminder();
 }
 
 /** 顶栏任务标签 + 左侧按钮文案 + 说明，全部跟着当前任务变 */
@@ -340,6 +381,7 @@ function switchTask(value) {
 
   renderTaskUi();
   renderLocal();
+  showGuideReminder(`切到${taskMeta(task).name}：先点「${taskMeta(task).actionLabel}」按钮再操作`);
   scheduleSave();
   setStatus('saving', `切到${taskMeta(task).name}`);
 }

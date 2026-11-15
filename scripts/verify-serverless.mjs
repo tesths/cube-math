@@ -36,11 +36,17 @@ let groups = Array.from({ length: 8 }, (_, i) => mkGroup(i));
 
 // 把格子坐标换算成页面坐标（与 stage.js 的取景规则一致）
 const FOV = 38;
-const DIR = (() => { const r = [0.5, Math.SQRT1_2, 0.5]; const l = Math.hypot(...r); return r.map((v) => v / l); })();
+const HOME_POLAR = (80 * Math.PI) / 180;
+const HOME_AZIMUTH = (10 * Math.PI) / 180;
+const DIR = [
+  Math.sin(HOME_POLAR) * Math.sin(HOME_AZIMUTH),
+  Math.cos(HOME_POLAR),
+  Math.sin(HOME_POLAR) * Math.cos(HOME_AZIMUTH),
+];
 function screenOf(rect, cell, cubes, { ground = false } = {}) {
   const contentTop = (cubes ?? []).reduce((m, c) => Math.max(m, c[1] + 1), 0);
   const top = Math.max(3.2, contentTop + 0.9);
-  const center = [0, top / 2 - top * 0.05, 0];
+  const center = [0, top / 2 - top * 0.2, 0];
   const aspect = rect.width / rect.height;
   const distance = fitDistance({ fovDeg: FOV, aspect, center, dir: DIR, min: [-2.5, 0, -2.5], max: [2.5, top, 2.5] });
   const ndc = projectNdc({ point: [cell[0] - 2, ground ? 0.02 : cell[1] + 0.5, cell[2] - 2], center, dir: DIR, distance, fovDeg: FOV, aspect });
@@ -168,7 +174,9 @@ await teacher.waitForTimeout(1500);
 const cardStage = teacher.locator('.group-card[data-group="3"] .card-stage');
 const cardBefore = await cardStage.screenshot();
 
-// 学生移动一块（拖动）
+// 学生移动一块（拖动）——先开启「移动木块」，否则闸门会让点击无效
+await student.click('#actionBtn');
+await student.waitForTimeout(250);
 const sceneBox = await student.locator('#scene').boundingBox();
 const cubes0 = groups[2].tasks[groups[2].task];
 const pFrom = screenOf(sceneBox, cubes0[0], cubes0);
@@ -298,7 +306,9 @@ const box3 = await page3.locator('#scene').boundingBox();
 const cubes3 = hangGroups[5].tasks[hangGroups[5].task];
 const from3 = screenOf(box3, cubes3[0], cubes3);
 const to3 = screenOf(box3, [0, 0, 4], cubes3, { ground: true });
-// 直接拖动（拖动不依赖"移动"开关）
+// 先开启「移动木块」，否则闸门会拦住这次拖动
+await page3.click('#actionBtn');
+await page3.waitForTimeout(250);
 await page3.mouse.move(from3.x, from3.y);
 await page3.mouse.down();
 await page3.mouse.move(to3.x, to3.y, { steps: 14 });

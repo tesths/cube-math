@@ -446,6 +446,91 @@ html.has-group .gate { display: none; }
   color: var(--ink-2);
 }
 
+/* ---------------------------------------------------------------- "先点按钮"引导
+   平板横屏（981~1366）会隐藏 .tool-tip，所以引导不能只写在说明文字里：
+   按钮上方一行步骤、按钮自身的呼吸光圈、舞台里的常驻提示条、误点时的气泡，四层都在。 */
+
+.tool-step {
+  margin: 0 0 2px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: .02em;
+  color: var(--blue);
+}
+
+/* 工具没点亮时，动作按钮一直轻轻呼吸；点亮后立刻停下 */
+.action-btn.is-idle {
+  background: var(--blue-soft);
+  border-color: var(--blue);
+  color: var(--blue);
+  animation: action-halo 1.9s ease-out infinite;
+}
+
+@keyframes action-halo {
+  0%   { box-shadow: 0 0 0 0 rgba(140, 90, 43, .38); }
+  70%  { box-shadow: 0 0 0 9px rgba(140, 90, 43, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(140, 90, 43, 0); }
+}
+
+/* 没点按钮就点了方块：按钮再用力闪两下，把视线拉回来 */
+.action-btn.nudge { animation: action-nudge .42s ease-out 2; }
+
+@keyframes action-nudge {
+  0%, 100% { transform: scale(1); }
+  35%      { transform: scale(1.045); box-shadow: 0 0 0 6px rgba(179, 64, 42, .20); }
+  70%      { transform: scale(.99); }
+}
+
+.guide-chip {
+  border-color: var(--blue-line);
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-weight: 650;
+}
+
+.guide-chip.is-idle::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: 1px;
+  animation: hint-dot 1.6s ease-in-out infinite;
+}
+
+@keyframes hint-dot { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+
+.guide-toast {
+  position: absolute;
+  top: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 28px);
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--panel);
+  font-size: 13.5px;
+  font-weight: 620;
+  white-space: nowrap;
+  box-shadow: var(--shadow-2);
+  pointer-events: none;
+  animation: toast-in .18s ease-out;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-btn.is-idle { animation: none; outline: 2px dashed var(--blue); outline-offset: 2px; }
+  .action-btn.nudge, .guide-chip.is-idle::before, .guide-toast { animation: none; }
+}
+
 
 /* ---------------------------------------------------------------- 3D 舞台 */
 
@@ -696,8 +781,9 @@ html.has-group .gate { display: none; }
 
 .stage-tools {
   position: absolute;
-  right: 14px;
-  bottom: 14px;
+  right: 14px;             /* 靠右 */
+  top: 50%;                /* 上下居中 */
+  transform: translateY(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -705,7 +791,7 @@ html.has-group .gate { display: none; }
   z-index: 3;
 }
 
-/* 复位：只做"回到正面视角"这一件事 */
+/* 「复位视角」：只做"回到起始角度"这一件事 */
 .view-reset {
   display: inline-flex;
   align-items: center;
@@ -855,7 +941,7 @@ body.is-focusing { overflow: hidden; }
 
 .focus-stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
-.stage-tools--large { right: 18px; bottom: 18px; gap: 10px; }
+.stage-tools--large { right: 18px; gap: 10px; }
 .orbit-pad--large { width: 96px; height: 96px; }
 .orbit-pad--large svg { width: 42px; height: 42px; }
 .orbit-pad--large span { font-size: 12px; }
@@ -883,6 +969,9 @@ body.is-focusing { overflow: hidden; }
   .view-reset { height: 44px; padding: 0 14px; font-size: 13px; }
   .view-reset svg { width: 16px; height: 16px; }
   .chip { font-size: 13px; padding: 6px 12px; }
+  .guide-chip { font-size: 13px; }
+  .guide-toast { font-size: 14px; padding: 11px 18px; }
+  .tool-step { font-size: 12.5px; }
 }
 
 /* 平板横屏（1024~1366）：三栏收窄一点，舞台优先 */
@@ -923,12 +1012,11 @@ body.is-focusing { overflow: hidden; }
   .focus-layer { overflow-y: auto; }
   .focus-bar { position: sticky; top: 0; z-index: 2; }
   .focus-hint { display: none; }
-  .orbit-pad { right: 10px; bottom: 10px; }
 }
 
 @media (max-width: 640px) {
-  /* 小屏上格子本来就小，视角球缩小并半透明，避免挡住右前角 */
-  .stage-tools { right: 8px; bottom: 8px; gap: 6px; }
+  /* 小屏上格子本来就小，视角球缩小并半透明（工具组仍在右侧垂直居中） */
+  .stage-tools { right: 8px; gap: 6px; }
   .orbit-pad {
     width: 64px;
     height: 64px;

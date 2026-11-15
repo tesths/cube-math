@@ -26,24 +26,59 @@ const els = {
   focusOrbitPad: $('focusOrbitPad'),
   focusReset: $('focusReset'),
   focusActionBtn: $('focusActionBtn'),
+  focusToolStep: $('focusToolStep'),
   focusResetBtn: $('focusResetBtn'),
   focusToolTip: $('focusToolTip'),
+  focusGuideChip: $('focusGuideChip'),
+  focusGuideToast: $('focusGuideToast'),
 };
 
 const TOOL_TIPS = {
-  move: '打开「移动」后，点中一块再点目标格子就能挪过去；也可以直接拖动。改完会自动保存。',
-  erase: '打开「拿走」后，点任意方块就把它拿走，上面的方块会自动落下。改完会自动保存。',
-  place: '打开「添上」后，点方块顶面或空格子就能加一块。改完会自动保存。',
+  move: '先点「移动木块」按钮，才能点木块；点中一块再点目标格子就能挪过去，也可以直接拖动。改完会自动保存。',
+  erase: '先点「拿走木块」按钮，才能点木块；点任意木块就把它拿走，上面的木块会自动落下。改完会自动保存。',
+  place: '先点「添上木块」按钮，才能加木块；点木块顶面或空格子就能添一块。改完会自动保存。',
 };
+
+/** 放大演示也是同一道闸门，引导文案与学生端一致 */
+const FOCUS_GUIDES = {
+  move:  { idle: '① 先点左边「移动木块」按钮',   active: '② 点中一块，再点目标格子（或直接拖动）' },
+  erase: { idle: '① 先点左边「拿走木块」按钮',   active: '② 点任意木块，就把它拿走' },
+  place: { idle: '① 先点「添上木块」按钮',       active: '② 点木块顶面或空格子，就能添一块' },
+};
+
+let focusGuideTimer = null;
 
 /** @type {Map<number, object>} */
 const cards = new Map();
 
 let focus = null;   // { group, stage, views, task, cubes, mode, dirty, saving, lastEditAt, saveTimer }
 
+// 调试入口：放大演示打开后，在 DevTools 敲 cubeView() 可查当前角度（与学生端同名同格式）
+window.cubeView = () => focus?.stage?.logView();
+
 function setStatus(state, text) {
   els.status.dataset.state = state;
   els.statusText.textContent = text;
+}
+
+/** 没先点工具按钮就点木块：弹提醒 + 让按钮再闪一下 */
+function showFocusGuide(message) {
+  if (!focus) return;
+  const label = taskMeta(focus.task).actionLabel;
+  els.focusGuideToast.textContent = message ?? `先点左边的「${label}」按钮，再操作木块`;
+  els.focusGuideToast.hidden = false;
+  els.focusActionBtn.classList.remove('nudge');
+  void els.focusActionBtn.offsetWidth;
+  els.focusActionBtn.classList.add('nudge');
+  clearTimeout(focusGuideTimer);
+  focusGuideTimer = setTimeout(hideFocusGuide, 2600);
+}
+
+function hideFocusGuide() {
+  clearTimeout(focusGuideTimer);
+  focusGuideTimer = null;
+  els.focusGuideToast.hidden = true;
+  els.focusActionBtn.classList.remove('nudge');
 }
 
 function relTime(ts) {
@@ -198,6 +233,7 @@ function openFocus(group) {
       onDelete: (pos) => commitFocus(focus.cubes.filter((c) => c.join(',') !== pos.join(','))),
       onPlacingChange: () => {},
       onKeyboardModeChange: () => {},
+      onLockedClick: () => showFocusGuide(),
     });
     stage.attachOrbitPad(els.focusOrbitPad);
     focus = {
@@ -229,6 +265,7 @@ function openFocus(group) {
     focus.views.render();
   });
   els.focusClose.focus({ preventScroll: true });
+  showFocusGuide();          // 打开就先提醒一次：这一步要点按钮
 }
 
 function renderFocusTools() {
@@ -246,8 +283,17 @@ function setFocusMode(mode) {
   focus.stage.setEraseMode(mode === 'erase');
   if (mode === 'place') focus.stage.beginPlacing({ sticky: true });
   else focus.stage.endPlacing();
+
   const action = taskMeta(focus.task).action;
-  els.focusActionBtn.setAttribute('aria-pressed', String(mode === action));
+  const active = mode === action;
+  els.focusActionBtn.setAttribute('aria-pressed', String(active));
+
+  const guide = FOCUS_GUIDES[action];
+  els.focusToolStep.textContent = active ? '② 现在到舞台里操作木块' : '① 先点下面的按钮';
+  els.focusGuideChip.textContent = active ? guide.active : guide.idle;
+  els.focusGuideChip.classList.toggle('is-idle', !active);
+  els.focusActionBtn.classList.toggle('is-idle', !active);
+  if (active) hideFocusGuide();
 }
 
 /** 老师改了以后先把这一组更新到界面，再防抖保存回服务器（学生端会跟着变） */
@@ -304,6 +350,7 @@ function closeFocus() {
   els.focusLayer.hidden = true;
   document.body.classList.remove('is-focusing');
   els.board.removeAttribute('inert');
+  hideFocusGuide();
   setFocusMode('none');
   cards.get(focus.group)?.card.focus({ preventScroll: true });
 }

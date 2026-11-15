@@ -3,11 +3,15 @@
  *
  * 交互模型
  *   左键：拖方块 = 移动到新位置（吸附）
- *   方块库：按住拖进场景 = 放一块；点一下 = 进入"连续放置"，之后在场景里点哪放哪
+ *   工具按钮（移动木块 / 拿走木块 / 添上木块）是**闸门**：没点亮之前点木块、按键盘都无效，
+ *           只会回调 onLockedClick，由界面弹一次"先点按钮"的引导
  *   右键拖动 = 转视角，中键拖动 = 平移（不提供缩放：取景已经保证整个区域都看得见）
- *   **平板没有右键**：舞台右下角有一个视角球，按住它拖动就能转视角（点一下回到正面视角）
- *   Esc / 右键 = 退出放置；橡皮模式 = 点谁删谁
+ *   **平板没有右键**：舞台底部中间有一个视角球，按住它拖动就能转视角；「复位视角」回正
+ *   Esc = 退出放置；拿走模式 = 点谁删谁
  *   键盘：舞台获得焦点后，方向键选格子、回车放一块、Delete 拿走那一列最上面一块
+ *
+ * 转视角的角度边界统一定义在 shared/view.js 的 VIEW_ANGLES（0°正面 ~ 90°右面，
+ * 俯视 ~ 平视），OrbitControls 与视角球共用它；每次转动都会往 console 打一条角度日志。
  *
  * 吸附规则：射线打到方块就落到"那个面外面那一列"的顶上，打到地面就落到那一格顶上。
  * 因此永远不会悬空、不会重叠、不会越界。
@@ -15,6 +19,11 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { LIMITS, keyOf } from '../shared/model.js';
+import {
+  VIEW_ANGLES, ORBIT_SPEED, clamp, logViewAngles, homeDirection,
+  CUBE_FACE, makeEdgeMaterial, EDGE_RENDER_ORDER,
+  frameTop, frameCenter,
+} from '../shared/view.js';
 import { fitDistance } from './camera-fit.js';
 
 const OFF_X = (LIMITS.sizeX - 1) / 2;
@@ -22,11 +31,8 @@ const OFF_Z = (LIMITS.sizeZ - 1) / 2;
 
 /** 地面范围：x/z 各 ±2.5 —— 这部分永远要完整可见，否则会有"点不到"的格子 */
 const GROUND_MIN = [-LIMITS.sizeX / 2, 0, -LIMITS.sizeZ / 2];
-/** 取景高度下限：方块很矮时也别把画面缩成一粒芝麻 */
-const MIN_FIT_TOP = 3.2;
-/** "中心 -> 相机"的方向 */
-// 默认视角：从"正面 + 右面"之间的 45° 方向看，仰角 45°（教材插图的透视感）
-const HOME_DIR = new THREE.Vector3(0.5, Math.SQRT1_2, 0.5).normalize();
+/** "中心 -> 相机"的方向：起始 = 俯仰 80° / 方位 10°（见 shared/view.js） */
+const HOME_DIR = homeDirection();
 
 /** 格子坐标 -> 世界坐标（方块中心） */
 export function toWorld(x, y, z, out = new THREE.Vector3()) {
@@ -52,8 +58,8 @@ export class CubeStage {
 
     this.cubes = [];
     this.occupied = new Set();
-    this.selected = null;      // 点中的那一块（高亮；「移动」模式下点第二个格子就会把它挪过去）
-    this.moveMode = false;     // 「移动」开关：点方块选中 → 点目标格子挪过去
+    this.selected = null;      // 点中的那一块（高亮；「移动木块」模式下点第二个格子就会把它挪过去）
+    this.moveMode = false;     // 「移动木块」开关：点木块选中 → 点目标格子挪过去
     this.eraseMode = false;
 
     this.placing = false;
@@ -96,12 +102,12 @@ export class CubeStage {
     controls.minDistance = 4.5;
     controls.maxDistance = 40;
     controls.enableZoom = false;          // 按要求不做滚轮缩放；取景已保证全部可见
-    // 只允许：从默认 45° 仰角往上看到俯视（不钻到地面以下）
-    controls.maxPolarAngle = Math.PI / 4;
-    controls.minPolarAngle = 0;
-    // 水平方向只允许在"正面 → 右面"这 90° 之间转
-    controls.minAzimuthAngle = 0;
-    controls.maxAzimuthAngle = Math.PI / 2;
+    // 角度边界取自 shared/view.js：右键 / 双指（OrbitControls）和视角球（orbitBy）
+    // 必须共用同一组边界，否则视角球算出来的角度会被 controls.update() 夹回去。
+    controls.minPolarAngle = VIEW_ANGLES.polarMin;
+    controls.maxPolarAngle = VIEW_ANGLES.polarMax;
+    controls.minAzimuthAngle = VIEW_ANGLES.azimuthMin;
+    controls.maxAzimuthAngle = VIEW_ANGLES.azimuthMax;
     controls.enablePan = true;
     controls.mouseButtons = {
       LEFT: null,                    // 左键留给方块操作
@@ -114,7 +120,17 @@ export class CubeStage {
     };
     this.controls = controls;
     // 用户一旦自己转过视角，就不在窗口变化时擅自改回去
-    controls.addEventListener('start', () => { this.userAdjusted = true; });
+    controls.addEventListener('start', () => {
+      this.userAdjusted = true;
+      this._orbitGesture = true;
+      logViewAngles(this.camera, controls.target, '开始拖动（右键 / 双指）');
+    });
+    controls.addEventListener('end', () => {
+      // 左键点方块也会触发 OrbitControls 的 end（它没有对应的 start），别刷屏
+      if (!this._orbitGesture) return;
+      this._orbitGesture = false;
+      logViewAngles(this.camera, controls.target, '结束拖动（右键 / 双指）');
+    });
 
     // 灯光：为看清"谁挡住谁"，用均匀柔和的光，不投影、不花哨
     scene.add(new THREE.HemisphereLight(0xfff6e8, 0xe8d3b4, 2.1));
@@ -125,10 +141,10 @@ export class CubeStage {
     fill.position.set(-9, 7, -7);
     scene.add(fill);
 
-    // 地面 = 方格纸本体
+    // 地面 = 方格纸本体。地面也往后推同样一点深度，方块贴地的那条底边才不会被地面挡掉。
     const base = new THREE.Mesh(
       new THREE.PlaneGeometry(LIMITS.sizeX, LIMITS.sizeZ),
-      new THREE.MeshBasicMaterial({ color: 0xfffaf3 }),
+      new THREE.MeshBasicMaterial({ color: 0xfffaf3, ...CUBE_FACE }),
     );
     base.rotation.x = -Math.PI / 2;
     base.position.y = 0;
@@ -136,13 +152,15 @@ export class CubeStage {
 
     const grid = new THREE.GridHelper(LIMITS.sizeX, LIMITS.sizeX, 0xdcc8a8, 0xeadbc4);
     grid.position.y = 0.004;
+    // 格子线正好压在方块底边上：让它只上色、不写深度，否则会把黑色底边"顶掉"
+    grid.material.depthWrite = false;
     scene.add(grid);
 
     this._addOrientationMarks(scene);
 
     const surround = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.PlaneGeometry(LIMITS.sizeX + 0.6, LIMITS.sizeZ + 0.6)),
-      new THREE.LineBasicMaterial({ color: 0xe6d6bd }),
+      new THREE.LineBasicMaterial({ color: 0xe6d6bd, depthWrite: false }),
     );
     surround.rotation.x = -Math.PI / 2;
     surround.position.y = -0.004;
@@ -151,10 +169,11 @@ export class CubeStage {
     // 共享几何与材质
     this.geo = new THREE.BoxGeometry(1, 1, 1);
     this.edgeGeo = new THREE.EdgesGeometry(this.geo);
-    this.matCube = new THREE.MeshLambertMaterial({ color: 0xf7efa0 });     // 教材同款浅黄
-    this.matHover = new THREE.MeshLambertMaterial({ color: 0xefe486 });
-    this.matSelected = new THREE.MeshLambertMaterial({ color: 0xeec0d1 });  // 点中的积木：粉
-    this.matEdge = new THREE.LineBasicMaterial({ color: 0x111111 });   // 细黑边
+    // 面材质往后推一点深度，1px 描边才能稳定压在面上（见 shared/view.js）
+    this.matCube = new THREE.MeshLambertMaterial({ color: 0xf7efa0, ...CUBE_FACE });     // 教材同款浅黄
+    this.matHover = new THREE.MeshLambertMaterial({ color: 0xefe486, ...CUBE_FACE });
+    this.matSelected = new THREE.MeshLambertMaterial({ color: 0xeec0d1, ...CUBE_FACE });  // 点中的积木：粉
+    this.matEdge = makeEdgeMaterial();   // 和地面格子线同款 1px 黑线
 
     this.cubeGroup = new THREE.Group();
     scene.add(this.cubeGroup);
@@ -162,6 +181,7 @@ export class CubeStage {
 
     this._observeResize();
     this._fitCamera();
+    logViewAngles(this.camera, controls.target, '初始默认视角');
     this._loop();
   }
 
@@ -182,10 +202,9 @@ export class CubeStage {
    * @param {boolean} animate 是否平滑过渡（放方块时用，避免相机"跳"一下）
    */
   _fitCamera({ animate = false } = {}) {
-    const top = Math.max(MIN_FIT_TOP, this._contentTop() + 0.9);
-    // 把视线中心压低一点点，画面整体就上移一点（地板更靠近垂直中线，下方留白多一些）
-    const lift = top * 0.05;
-    const center = new THREE.Vector3(0, top / 2 - lift, 0);
+    const top = frameTop(this._contentTop());
+    // 视线中心压低一点，积木整体落在画面偏上（现在只有两三层，上方留白太多）
+    const center = frameCenter(top);
     const distance = fitDistance({
       fovDeg: this.camera.fov,
       aspect: this.camera.aspect,
@@ -226,18 +245,28 @@ export class CubeStage {
     this.controls.target.lerpVectors(tween.fromTarget, tween.toTarget, eased);
     this.controls.update();
     this.needsRender = true;
-    if (t >= 1) this._camTween = null;
+    if (t >= 1) {
+      this._camTween = null;
+      // 复位是补间动画，等相机会真的到位了再打角度日志
+      if (this._pendingLogTag) {
+        this._logView(this._pendingLogTag);
+        this._pendingLogTag = null;
+      }
+    }
     return true;
   }
 
-  /** 按屏幕像素位移转动视角（视角球、方向键共用） */
+  /** 按屏幕像素位移转动视角（视角球拖动） */
   orbitBy(dx, dy) {
     const offset = new THREE.Vector3().subVectors(this.camera.position, this.controls.target);
     const spherical = new THREE.Spherical().setFromVector3(offset);
-    spherical.theta -= dx * 0.009;
-    spherical.phi = Math.min(
-      Math.PI / 2 - 0.08,
-      Math.max(0.2, spherical.phi - dy * 0.009),
+    // 直接夹到共享边界：这样视角球与右键拖动能转到的角度完全一致，
+    // 也不会出现"算出来一个角度、又被 controls.update() 夹回去"的跳变。
+    spherical.theta = clamp(
+      spherical.theta - dx * ORBIT_SPEED, VIEW_ANGLES.azimuthMin, VIEW_ANGLES.azimuthMax,
+    );
+    spherical.phi = clamp(
+      spherical.phi - dy * ORBIT_SPEED, VIEW_ANGLES.polarMin, VIEW_ANGLES.polarMax,
     );
     offset.setFromSpherical(spherical);
     this.camera.position.copy(this.controls.target).add(offset);
@@ -245,12 +274,29 @@ export class CubeStage {
     this.controls.update();
     this.userAdjusted = true;
     this.needsRender = true;
+    this._logView('视角球拖动中', { dx: `${dx}px`, dy: `${dy}px` }, true);
+  }
+
+  /** 打一条角度 console；拖动过程节流，避免每帧刷屏 */
+  _logView(tag, extra = {}, throttle = false) {
+    const now = performance.now();
+    if (throttle && now - (this._lastViewLog ?? 0) < 120) return;
+    this._lastViewLog = now;
+    return logViewAngles(this.camera, this.controls.target, tag, extra);
+  }
+
+  /** DevTools 入口：控制台敲 cubeView() 就能看当前角度与可转范围 */
+  logView(tag = 'DevTools 手动查询') {
+    return this._logView(tag);
   }
 
   /** 回到默认取景（正视角） */
   resetView() {
     this.userAdjusted = false;
     this._fitCamera({ animate: true });
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) this._logView('「复位视角」完成 · 回到起始角度');
+    else this._pendingLogTag = '「复位视角」完成 · 回到起始角度';
   }
 
   /**
@@ -265,6 +311,7 @@ export class CubeStage {
       padEl.setPointerCapture?.(event.pointerId);
       dragging = { x: event.clientX, y: event.clientY, moved: 0 };
       padEl.dataset.active = 'true';
+      this._logView('按下视角球', { '提示': '按住左右拖 = 转方位角；上下拖 = 转俯仰角' });
     });
 
     padEl.addEventListener('pointermove', (event) => {
@@ -278,12 +325,13 @@ export class CubeStage {
       this.orbitBy(dx, dy);
     });
 
-    // 只负责转视角：点一下不再回正（回正交给单独的「复位」按钮，避免学生误触）
+    // 只负责转视角：点一下不再回正（回正交给单独的「复位视角」按钮，避免学生误触）
     const finish = (event) => {
       if (!dragging) return;
       dragging = null;
       padEl.dataset.active = 'false';
       padEl.releasePointerCapture?.(event.pointerId);
+      this._logView('松开视角球 · 最终角度');
     };
 
     padEl.addEventListener('pointerup', finish);
@@ -299,7 +347,8 @@ export class CubeStage {
     const edge = (points, color) => {
       const line = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(points),
-        new THREE.LineBasicMaterial({ color }),
+        // 地面标记同样不写深度，免得遮住贴着地面的方块底边
+        new THREE.LineBasicMaterial({ color, depthWrite: false }),
       );
       scene.add(line);
     };
@@ -351,10 +400,12 @@ export class CubeStage {
     this.ghostGroup = new THREE.Group();
     this.ghostMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
       color: 0x1c7a52, transparent: true, opacity: 0.42, depthWrite: false,
+      // 幽灵方块只做落点提示，把面稍微往后推，边框就不会和半透明面抢深度
+      polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
     }));
     const edges = new THREE.LineSegments(
       new THREE.EdgesGeometry(geo),
-      new THREE.LineBasicMaterial({ color: 0x14532d, transparent: true, opacity: 0.8 }),
+      new THREE.LineBasicMaterial({ color: 0x14532d, transparent: true, opacity: 0.8, depthWrite: false }),
     );
     this.ghostGroup.add(this.ghostMesh, edges);
     this.ghostGroup.visible = false;
@@ -404,7 +455,7 @@ export class CubeStage {
       toWorld(x, y, z, mesh.position);
       mesh.userData.cell = [x, y, z];
       const outline = new THREE.LineSegments(this.edgeGeo, this.matEdge);
-      outline.scale.setScalar(1.002);   // 稍微外扩，避免和面共面产生断断续续的线
+      outline.renderOrder = EDGE_RENDER_ORDER;   // 面先画、线后画；线不写深度，互不打架
       mesh.add(outline);
       this.cubeGroup.add(mesh);
       this.meshes.set(keyOf(x, y, z), mesh);
@@ -455,7 +506,7 @@ export class CubeStage {
     this.needsRender = true;
   }
 
-  /** 「移动」开关：开启后，选中一块再点别的格子就能把它挪过去（平板友好） */
+  /** 「移动木块」开关：开启后，选中一块再点别的格子就能把它挪过去（平板友好） */
   setMoveMode(on) {
     this.moveMode = !!on;
     this.canvas.style.cursor = this.moveMode ? 'grab' : '';
@@ -740,6 +791,18 @@ export class CubeStage {
   };
 
   _onCanvasKeydown = (event) => {
+    const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', ' ', 'Delete', 'Backspace'];
+
+    // 键盘也走同一道闸门：没点工具按钮之前方向键 / 回车 / Delete 都不生效，
+    // 只弹一次"先点按钮"的提醒，避免学生用键盘绕过按钮。
+    if (!this.placing && !this.moveMode && !this.eraseMode) {
+      if (keys.includes(event.key)) {
+        event.preventDefault();
+        this.handlers.onLockedClick?.('keyboard');
+      }
+      return;
+    }
+
     if (!this.focusCell) this.focusCell = { x: 0, z: 0 };
     const { x, z } = this.focusCell;
 
@@ -771,7 +834,7 @@ export class CubeStage {
       }
 
       // 移动模式：把选中的方块挪到光标格子
-      if (this.selected) {
+      if (this.moveMode && this.selected) {
         const from = this.selected;
         const target = this._settle(x, z, keyOf(...from));
         if (target.legal && (target.x !== from[0] || target.y !== from[1] || target.z !== from[2])) {
@@ -816,6 +879,14 @@ export class CubeStage {
       if (this.placing) {
         const target = this._targetAt(event.clientX, event.clientY);
         if (target?.legal) this.handlers.onPlace?.([target.x, target.y, target.z]);
+        return;
+      }
+
+      // 闸门：没先点工具按钮（移动 / 拿走 / 添上）之前，方块一律"看得见、点不动"。
+      // 之前这里无条件 setSelected + 起拖拽，所以任务二、任务三不点按钮也能挪方块。
+      // 交给上层弹一次引导提醒，舞台本身不改动任何状态。
+      if (!this.moveMode && !this.eraseMode) {
+        this.handlers.onLockedClick?.('canvas');
         return;
       }
 
@@ -890,6 +961,8 @@ export class CubeStage {
     window.removeEventListener('pointermove', this._onWindowMove);
     window.removeEventListener('pointerup', this._onWindowUp);
     this.controls.dispose();
+    this.edgeGeo?.dispose();
+    this.matEdge?.dispose();
     this.renderer.dispose();
   }
 }

@@ -30,16 +30,23 @@ async function postGroup(g, cubes, task) {
   if (!res.ok) throw new Error(`post group ${g}: ${await res.text()}`);
 }
 const T1 = [[1, 0, 3], [1, 0, 2], [2, 0, 2], [3, 0, 2], [2, 0, 1], [1, 1, 2]];
-const T3 = [[1, 0, 3], [1, 0, 2], [2, 0, 2]];
+const T3 = [[1, 0, 3], [1, 0, 2], [2, 0, 2], [2, 1, 2]];
 const norm = (a) => JSON.stringify([...a].map((c) => c.join(',')).sort());
+const HOME_POLAR = (80 * Math.PI) / 180;
+const HOME_AZIMUTH = (10 * Math.PI) / 180;
+const HOME_DIR = [
+  Math.sin(HOME_POLAR) * Math.sin(HOME_AZIMUTH),
+  Math.cos(HOME_POLAR),
+  Math.sin(HOME_POLAR) * Math.cos(HOME_AZIMUTH),
+];
 
 /** 把某个舞台的格子坐标换算成页面坐标（取景规则与 stage.js 一致） */
 function camFor(box, cubes) {
   const contentTop = cubes.reduce((m, c) => Math.max(m, c[1] + 1), 0);
   const top = Math.max(3.2, contentTop + 0.9);
-  const center = [0, top / 2 - top * 0.05, 0];
+  const center = [0, top / 2 - top * 0.2, 0];
   const aspect = box.width / box.height;
-  const DIR = (() => { const r = [0.5, Math.SQRT1_2, 0.5]; const l = Math.hypot(...r); return r.map((v) => v / l); })();
+  const DIR = HOME_DIR;
   const distance = fitDistance({ fovDeg: 38, aspect, center, dir: DIR, min: [-2.5, 0, -2.5], max: [2.5, top, 2.5] });
   return (c, ground = false) => {
     const n = projectNdc({ point: [c[0] - 2, ground ? 0.02 : c[1] + 0.5, c[2] - 2], center, dir: DIR, distance, fovDeg: 38, aspect });
@@ -84,7 +91,7 @@ try {
   check('进组后地址栏保留 ?group=3', page.url().includes('group=3'), page.url());
   check('工作区里没有教师端链接', (await page.locator('.app a[href="/teacher"]').count()) === 0);
   check('默认任务是任务一', (await page.locator('.task-tab[aria-pressed="true"]').textContent()).trim() === '任务一');
-  check('任务一按钮是「移动」', (await page.textContent('#actionBtn')).trim() === '移动');
+  check('任务一按钮是「移动木块」', (await page.textContent('#actionBtn')).trim() === '移动木块');
   check('任务一初始 6 块', (await page.textContent('#cubeCount')).trim() === '6 块');
   check('任务栏三个任务', (await page.locator('.task-tab').count()) === 3);
   const tabTexts = await page.locator('.task-tab').allTextContents();
@@ -105,7 +112,7 @@ try {
   // ---------- 4. 任务二：拿走
   await page.click('.task-tab[data-task="2"]');
   await page.waitForTimeout(1000);
-  check('任务二按钮是「拿走」', (await page.textContent('#actionBtn')).trim() === '拿走');
+  check('任务二按钮是「拿走木块」', (await page.textContent('#actionBtn')).trim() === '拿走木块');
   check('任务二初始 6 块', (await page.textContent('#cubeCount')).trim() === '6 块');
   await page.click('#actionBtn');
   await page.waitForTimeout(200);
@@ -131,20 +138,20 @@ try {
   // ---------- 5. 任务三：添上
   await page.click('.task-tab[data-task="3"]');
   await page.waitForTimeout(1000);
-  check('任务三按钮是「添上」', (await page.textContent('#actionBtn')).trim() === '添上');
-  check('任务三初始 3 块', (await page.textContent('#cubeCount')).trim() === '3 块');
+  check('任务三按钮是「添上木块」', (await page.textContent('#actionBtn')).trim() === '添上木块');
+  check('任务三初始 4 块', (await page.textContent('#cubeCount')).trim() === '4 块');
   await page.click('#actionBtn');
   await page.waitForTimeout(200);
   st = await scene(3);
-  p = cam(st.cubes)([2, 0, 2]);
+  p = cam(st.cubes)([0, 0, 0], true);
   await page.mouse.click(p.x, p.y);
   await page.waitForTimeout(1000);
   st = await scene(3);
-  check('任务三添一块正好完成（4 块目标图形）', norm(st.cubes) === norm([[1, 0, 3], [1, 0, 2], [2, 0, 2], [2, 1, 2]]), JSON.stringify(st.cubes));
+  check('任务三添一块 → 5 块且含 [0,0,0]', st.cubes.length === 5 && st.cubes.some((c) => c[0] === 0 && c[1] === 0 && c[2] === 0), JSON.stringify(st.cubes));
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(1300);
   st = await scene(3);
-  check('刷新后任务三 4 块保留', st.task === 3 && st.cubes.length === 4, `task=${st.task} ${st.cubes.length} 块`);
+  check('刷新后任务三 5 块保留', st.task === 3 && st.cubes.length === 5, `task=${st.task} ${st.cubes.length} 块`);
 
   // ---------- 6. 任务一：移动 + 落点预览
   await page.click('.task-tab[data-task="1"]');
@@ -232,9 +239,9 @@ try {
   const syncBox = await page.locator('#scene').boundingBox();
   const syncCam = (() => {
     const top = Math.max(3.2, s2.cubes.reduce((m, c) => Math.max(m, c[1] + 1), 0) + 0.9);
-    const center = [0, top / 2 - top * 0.05, 0];
+    const center = [0, top / 2 - top * 0.2, 0];
     const aspect = syncBox.width / syncBox.height;
-    const DIR = (() => { const r = [0.5, Math.SQRT1_2, 0.5]; const l = Math.hypot(...r); return r.map((v) => v / l); })();
+    const DIR = HOME_DIR;
     const distance = fitDistance({ fovDeg: 38, aspect, center, dir: DIR, min: [-2.5, 0, -2.5], max: [2.5, top, 2.5] });
     return (c, ground = false) => {
       const n = projectNdc({ point: [c[0] - 2, ground ? 0.02 : c[1] + 0.5, c[2] - 2], center, dir: DIR, distance, fovDeg: 38, aspect });
@@ -261,7 +268,7 @@ try {
   check('演示里有三视图', (await teacher.locator('#focusViews .view-item').count()) === 3);
 
   const tb = (await teacher.locator('#focusTools .btn').allTextContents()).map((t) => t.trim());
-  check('放大界面有工具栏（动作 + 重置）', tb.length === 2 && ['移动', '拿走', '添上'].includes(tb[0]), tb.join('/'));
+  check('放大界面有工具栏（动作 + 重置）', tb.length === 2 && ['移动木块', '拿走木块', '添上木块'].includes(tb[0]), tb.join('/'));
 
   // 老师直接改这一组：工具栏「移动」+ 拖动一块
   const beforeEdit = (await scene(3)).cubes.map((c) => [...c]);

@@ -184,26 +184,52 @@ export function drawView(canvas, view, def, cell) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, cssW, cssH);
 
+  const x0 = PAD.left;
+  const y0 = PAD.top;
+  const x1 = x0 + view.cols * cell;
+  const y1 = y0 + view.rows * cell;
+
+  // 先铺每一格的底色，不描边
   for (let row = 0; row < view.rows; row++) {
     for (let col = 0; col < view.cols; col++) {
-      const x = PAD.left + col * cell;
-      const y = PAD.top + row * cell;
-      const on = view.cells[row][col];
+      ctx.fillStyle = view.cells[row][col] ? COLOR.filled : COLOR.empty;
+      ctx.fillRect(x0 + col * cell, y0 + row * cell, cell, cell);
+    }
+  }
 
+  // 再把网格线画一遍：每条公共边只画**一条**。
+  // 旧版是每格各 stroke 一个 rect(x+0.5, y+0.5, cell-1, cell-1)，相邻格之间
+  // 会留出 1px 缝、看起来像"两条边"，填充格还用了 1.4px 显得更粗。
+  // 现在统一 1px，颜色看相邻两格有没有方块：有 → 深色，都空 → 浅色。
+  const crisp = (v) => Math.round(v) + 0.5;
+  ctx.lineWidth = 1;
+  for (let col = 0; col <= view.cols; col++) {
+    const x = crisp(x0 + col * cell);
+    for (let row = 0; row < view.rows; row++) {
+      const leftOn = col > 0 && view.cells[row][col - 1];
+      const rightOn = col < view.cols && view.cells[row][col];
+      ctx.strokeStyle = leftOn || rightOn ? COLOR.filledLine : COLOR.emptyLine;
       ctx.beginPath();
-      ctx.rect(x + 0.5, y + 0.5, cell - 1, cell - 1);
-      ctx.fillStyle = on ? COLOR.filled : COLOR.empty;
-      ctx.fill();
-      ctx.lineWidth = on ? 1.4 : 1;
-      ctx.strokeStyle = on ? COLOR.filledLine : COLOR.emptyLine;
+      ctx.moveTo(x, y0 + row * cell);
+      ctx.lineTo(x, y0 + (row + 1) * cell);
+      ctx.stroke();
+    }
+  }
+  for (let row = 0; row <= view.rows; row++) {
+    const y = crisp(y0 + row * cell);
+    for (let col = 0; col < view.cols; col++) {
+      const aboveOn = row > 0 && view.cells[row - 1][col];
+      const belowOn = row < view.rows && view.cells[row][col];
+      ctx.strokeStyle = aboveOn || belowOn ? COLOR.filledLine : COLOR.emptyLine;
+      ctx.beginPath();
+      ctx.moveTo(x0 + col * cell, y);
+      ctx.lineTo(x0 + (col + 1) * cell, y);
       ctx.stroke();
     }
   }
 
   // 尺寸线：宽 N 格（真数据，不是装饰）
-  const dimY = PAD.top + view.rows * cell + 16;
-  const x0 = PAD.left;
-  const x1 = PAD.left + view.cols * cell;
+  const dimY = y1 + 16;
   ctx.strokeStyle = COLOR.dim;
   ctx.lineWidth = 1;
   ctx.beginPath();

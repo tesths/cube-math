@@ -102,33 +102,38 @@
   <main class="workspace">
     <section class="panel palette" aria-label="工具">
       <div class="tool-list">
-        <button class="btn btn-block" id="actionBtn" type="button" aria-pressed="false">移动</button>
-        <button class="btn btn-block" id="resetBtn" type="button">重置</button>
+        <p class="tool-step" id="toolStep">① 先点下面的按钮</p>
+        <button class="btn btn-block action-btn" id="actionBtn" type="button" aria-pressed="false">移动木块</button>
+        <button class="btn btn-block" id="resetBtn" type="button">重置木块</button>
       </div>
-      <p class="tool-tip" id="toolTip">打开「移动」后，点中一块再点目标格子就能挪过去；也可以直接拖动。「重置」回到这个任务最初的样子。</p>
+      <p class="tool-tip" id="toolTip">先点「移动木块」按钮，才能点木块；点中一块再点目标格子就能挪过去，也可以直接拖动。「重置木块」回到这个任务最初的样子。</p>
     </section>
 
     <section class="panel stage" id="stage" aria-label="摆放区" data-placing="false">
       <canvas id="scene" tabindex="0" role="application"
-              aria-label="摆放区：点一块方块选中它；打开「移动」后点目标格子即可挪过去，也可以直接拖动"></canvas>
+              aria-label="摆放区：先点左边的工具按钮，才能操作木块；打开「移动木块」后点中一块再点目标格子挪过去，也可以直接拖动"></canvas>
       <div class="stage-stat">
         <span class="chip strong" id="cubeCount">0 块</span>
         <span class="chip" id="spaceHint">区域 5×5 格，最高 5 层</span>
       </div>
       <div class="stage-hint">
-        <span class="chip" id="placingHint" hidden>连续放置中 · 点「小方块」或按 Esc 结束</span>
-        <span class="chip" id="kbHint" hidden>方向键选格子 · 回车把选中的方块挪过去</span>
+        <span class="chip guide-chip" id="guideChip" aria-live="polite">① 先点左边「移动木块」按钮</span>
+        <span class="chip" id="placingHint" hidden>连续放置中 · 再点「添上木块」或按 Esc 结束</span>
+        <span class="chip" id="kbHint" hidden>方向键选格子 · 回车把选中的木块挪过去</span>
       </div>
+
+      <!-- 没点工具按钮就点木块时，弹一次提醒并把左边的按钮再闪一下 -->
+      <div class="guide-toast" id="guideToast" role="status" aria-live="assertive" hidden></div>
 
       <div class="stage-tools">
         <button class="view-reset" id="resetView" type="button"
-                aria-label="回到正面视角" title="回到正面视角">
+                aria-label="复位视角" title="复位视角：回到起始角度">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M3.5 12a8.5 8.5 0 1 0 2.9-6.4"/>
             <path d="M3.5 4v4.6h4.6"/>
           </svg>
-          <span>复位</span>
+          <span>复位视角</span>
         </button>
         <button class="orbit-pad" id="orbitPad" type="button"
                 aria-label="按住拖动可以转视角" title="按住拖动转视角">
@@ -149,7 +154,7 @@
       </div>
       <div class="view-placeholder" id="viewPlaceholder">
         <strong>搭好了吗？</strong>
-        <p>点上面的按钮，一次就能看到这个图形从正面、左面、上面看分别是什么样子。</p>
+        <p>点上面的按钮，一次就能看到这个图形从正面、右面、上面看分别是什么样子。</p>
       </div>
       <div class="views-grid" id="viewsGrid" hidden></div>
       <p class="view-foot" id="viewFoot" hidden>方格图里一格就是一个方块；三张图用的是同一个格子大小，可以直接比宽窄。</p>

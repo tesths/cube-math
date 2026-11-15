@@ -58,20 +58,25 @@
   </header>
   <div class="focus-body">
     <div class="focus-tools" id="focusTools">
-      <button class="btn btn-block" id="focusActionBtn" type="button" aria-pressed="false">移动</button>
-      <button class="btn btn-block" id="focusResetBtn" type="button">重置</button>
-      <p class="tool-tip" id="focusToolTip">打开「移动」后，点中一块再点目标格子就能挪过去；也可以直接拖动。</p>
+      <p class="tool-step" id="focusToolStep">① 先点下面的按钮</p>
+      <button class="btn btn-block action-btn" id="focusActionBtn" type="button" aria-pressed="false">移动木块</button>
+      <button class="btn btn-block" id="focusResetBtn" type="button">重置木块</button>
+      <p class="tool-tip" id="focusToolTip">先点「移动木块」按钮，才能点木块；点中一块再点目标格子就能挪过去，也可以直接拖动。</p>
     </div>
     <div class="focus-stage" id="focusStage">
-      <canvas id="focusScene" aria-label="这一组摆放的立体图"></canvas>
+      <canvas id="focusScene" aria-label="这一组摆放的立体图；先点左边的工具按钮才能操作木块"></canvas>
+      <div class="stage-hint">
+        <span class="chip guide-chip" id="focusGuideChip" aria-live="polite">① 先点左边「移动木块」按钮</span>
+      </div>
+      <div class="guide-toast" id="focusGuideToast" role="status" aria-live="assertive" hidden></div>
       <div class="stage-tools stage-tools--large">
-        <button class="view-reset view-reset--large" id="focusReset" type="button" aria-label="回到正面视角">
+        <button class="view-reset view-reset--large" id="focusReset" type="button" aria-label="复位视角">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M3.5 12a8.5 8.5 0 1 0 2.9-6.4"/>
             <path d="M3.5 4v4.6h4.6"/>
           </svg>
-          <span>复位</span>
+          <span>复位视角</span>
         </button>
         <button class="orbit-pad orbit-pad--large" id="focusOrbitPad" type="button"
                 aria-label="按住拖动可以转视角">

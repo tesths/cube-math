@@ -10,6 +10,11 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { LIMITS } from '../shared/model.js';
+import {
+  VIEW_ANGLES, ORBIT_SPEED, clamp, logViewAngles, homeDirection,
+  CUBE_FACE, makeEdgeMaterial, EDGE_RENDER_ORDER,
+  MIN_FIT_TOP, frameTop, frameCenter,
+} from '../shared/view.js';
 import { fitDistance } from '../student/camera-fit.js';
 
 const OFF_X = (LIMITS.sizeX - 1) / 2;
@@ -17,14 +22,15 @@ const OFF_Z = (LIMITS.sizeZ - 1) / 2;
 
 const geo = new THREE.BoxGeometry(1, 1, 1);
 const edgeGeo = new THREE.EdgesGeometry(geo);
-const matCube = new THREE.MeshLambertMaterial({ color: 0xf7efa0 });
-const matEdge = new THREE.LineBasicMaterial({ color: 0x111111 });
+// 与学生端同一套 1px 描边 / 面偏移：8 张小卡片上每条边都稳定可见
+const matCube = new THREE.MeshLambertMaterial({ color: 0xf7efa0, ...CUBE_FACE });
+const matEdge = makeEdgeMaterial();
 const baseGeo = new THREE.PlaneGeometry(LIMITS.sizeX, LIMITS.sizeZ);
-const baseMat = new THREE.MeshBasicMaterial({ color: 0xfffaf3 });
+// 地面同样往后推深度，方块贴地的底边才不会被地面挡掉
+const baseMat = new THREE.MeshBasicMaterial({ color: 0xfffaf3, ...CUBE_FACE });
 
 const GROUND_MIN = [-LIMITS.sizeX / 2, 0, -LIMITS.sizeZ / 2];
-const MIN_FIT_TOP = 3.2;
-const HOME_DIR = new THREE.Vector3(0.5, Math.SQRT1_2, 0.5).normalize();
+const HOME_DIR = homeDirection();   // 与学生端一致的起始 / 复位视角：俯仰 80°、方位 10°
 
 export class MiniStage {
   constructor(canvas, { interactive = false, pad = null } = {}) {
@@ -56,6 +62,7 @@ export class MiniStage {
 
     const grid = new THREE.GridHelper(LIMITS.sizeX, LIMITS.sizeX, 0xdcc8a8, 0xeadbc4);
     grid.position.y = 0.004;
+    grid.material.depthWrite = false;   // 别把方块贴地的黑色底边顶掉
     scene.add(grid);
 
     this._addOrientationMarks(scene);
@@ -72,10 +79,11 @@ export class MiniStage {
       controls.dampingFactor = 0.12;
       controls.enableZoom = false;      // 与学生端一致：不做缩放，靠取景保证全都看得见
       controls.enablePan = false;
-      controls.maxPolarAngle = Math.PI / 4;
-      controls.minPolarAngle = 0;
-      controls.minAzimuthAngle = 0;
-      controls.maxAzimuthAngle = Math.PI / 2;
+      // 与学生端共用同一组角度边界（见 shared/view.js）
+      controls.minPolarAngle = VIEW_ANGLES.polarMin;
+      controls.maxPolarAngle = VIEW_ANGLES.polarMax;
+      controls.minAzimuthAngle = VIEW_ANGLES.azimuthMin;
+      controls.maxAzimuthAngle = VIEW_ANGLES.azimuthMax;
       controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
       controls.touches = { ONE: null, TWO: THREE.TOUCH?.ROTATE };
       this.controls = controls;
@@ -91,7 +99,7 @@ export class MiniStage {
     const line = (points, color) => {
       scene.add(new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(points),
-        new THREE.LineBasicMaterial({ color }),
+        new THREE.LineBasicMaterial({ color, depthWrite: false }),
       ));
     };
     line([new THREE.Vector3(-halfX, 0.014, halfZ), new THREE.Vector3(halfX, 0.014, halfZ)], 0x8c5a2b);
@@ -130,11 +138,10 @@ export class MiniStage {
     return top;
   }
 
-  /** 与学生端同一套取景规则：地面全宽 × max(3.2, 内容高度+余量) */
+  /** 与学生端同一套取景规则（角度、高度、上移量都共用 shared/view.js） */
   _fit() {
-    const top = Math.max(MIN_FIT_TOP, this._contentTop() + 0.9);
-    const lift = top * 0.05;   // 与学生端一致：画面整体上移一点
-    const center = new THREE.Vector3(0, top / 2 - lift, 0);
+    const top = frameTop(this._contentTop());
+    const center = frameCenter(top);
     const distance = fitDistance({
       fovDeg: this.camera.fov,
       aspect: this.camera.aspect,
@@ -152,19 +159,23 @@ export class MiniStage {
   orbitBy(dx, dy) {
     const offset = new THREE.Vector3().subVectors(this.camera.position, this.controls.target);
     const spherical = new THREE.Spherical().setFromVector3(offset);
-    spherical.theta -= dx * 0.009;
-    spherical.phi = Math.min(Math.PI / 2 - 0.08, Math.max(0.2, spherical.phi - dy * 0.009));
+    spherical.theta = clamp(spherical.theta - dx * ORBIT_SPEED, VIEW_ANGLES.azimuthMin, VIEW_ANGLES.azimuthMax);
+    spherical.phi = clamp(spherical.phi - dy * ORBIT_SPEED, VIEW_ANGLES.polarMin, VIEW_ANGLES.polarMax);
     offset.setFromSpherical(spherical);
     this.camera.position.copy(this.controls.target).add(offset);
     this.camera.lookAt(this.controls.target);
     this.controls.update();
     this.userAdjusted = true;
     this.needsRender = true;
+    logViewAngles(this.camera, this.controls.target, '教师端视角球');
   }
 
   resetView() {
     this.userAdjusted = false;
-    if (this.interactive) this._fit();
+    if (this.interactive) {
+      this._fit();
+      logViewAngles(this.camera, this.controls.target, '教师端「复位视角」');
+    }
   }
 
   attachOrbitPad(padEl) {
@@ -223,7 +234,7 @@ export class MiniStage {
       const mesh = new THREE.Mesh(geo, matCube);
       mesh.position.set(x - OFF_X, y + 0.5, z - OFF_Z);
       const outline = new THREE.LineSegments(edgeGeo, matEdge);
-      outline.scale.setScalar(1.002);
+      outline.renderOrder = EDGE_RENDER_ORDER;
       mesh.add(outline);
       this.group.add(mesh);
     }
@@ -255,12 +266,21 @@ export class MiniStage {
     if (!this.interactive) this.render();
   }
 
-  /** 小卡片：固定等轴测视角，按占地大小不变（8 格同屏可比） */
+  /** 8 张小卡片：与学生端 / 放大演示完全相同的起始角度（俯仰 80°、方位 10°）和上移量。
+   *  取景高度固定，8 张卡片比例一致，方便横向比较。 */
   _placeStatic() {
-    const distance = 11.2;
-    this.camera.position.copy(new THREE.Vector3(6.6, 6.9, 8.4)).normalize().multiplyScalar(distance)
-      .add(new THREE.Vector3(0, 1.05, 0));
-    this.camera.lookAt(new THREE.Vector3(0, 1.05, 0));
+    const top = MIN_FIT_TOP;
+    const center = frameCenter(top);
+    const distance = fitDistance({
+      fovDeg: this.camera.fov,
+      aspect: this.camera.aspect,
+      center: [center.x, center.y, center.z],
+      dir: [HOME_DIR.x, HOME_DIR.y, HOME_DIR.z],
+      min: GROUND_MIN,
+      max: [LIMITS.sizeX / 2, top, LIMITS.sizeZ / 2],
+    });
+    this.camera.position.copy(center).addScaledVector(HOME_DIR, distance);
+    this.camera.lookAt(center);
   }
 
   render() {

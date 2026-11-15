@@ -23,13 +23,20 @@ const { chromium, executablePath } = await loadBrowser();
 console.log(`浏览器：${executablePath}\n`);
 
 const FOV = 38;
-const DIR = (() => { const r = [0.5, Math.SQRT1_2, 0.5]; const l = Math.hypot(...r); return r.map((v) => v / l); })();
+// 与 shared/view.js 的 HOME_ANGLES 一致：俯仰 80°、方位 10°
+const HOME_POLAR = (80 * Math.PI) / 180;
+const HOME_AZIMUTH = (10 * Math.PI) / 180;
+const DIR = [
+  Math.sin(HOME_POLAR) * Math.sin(HOME_AZIMUTH),
+  Math.cos(HOME_POLAR),
+  Math.sin(HOME_POLAR) * Math.cos(HOME_AZIMUTH),
+];
 
-/** 与 stage.js 完全一致的取景参数：按内容高度、并整体上移 5% */
+/** 与 stage.js 完全一致的取景参数：按内容高度、并整体上移 20% */
 function cameraFor(cubes) {
   const contentTop = (cubes ?? []).reduce((m, c) => Math.max(m, c[1] + 1), 0);
   const top = Math.max(3.2, contentTop + 0.9);
-  return { top, center: [0, top / 2 - top * 0.05, 0] };
+  return { top, center: [0, top / 2 - top * 0.2, 0] };
 }
 
 /** 把格子坐标换算成页面坐标（用于真的去点某个方块） */
@@ -72,9 +79,9 @@ async function taskOf(group) {
 
 const hash = (buf) => crypto.createHash('sha1').update(buf).digest('hex').slice(0, 12);
 
-// 任务一初始（6 块）与任务三初始（3 块），给不同组摆不同任务，方便看教师端差异
+// 任务一初始（6 块）与任务三初始（4 块，含正中间上方那块），给不同组摆不同任务，方便看教师端差异
 const T1 = [[1, 0, 3], [1, 0, 2], [2, 0, 2], [3, 0, 2], [2, 0, 1], [1, 1, 2]];
-const T3 = [[1, 0, 3], [1, 0, 2], [2, 0, 2]];
+const T3 = [[1, 0, 3], [1, 0, 2], [2, 0, 2], [2, 1, 2]];
 const SEED = [
   [1, T1, 1], [2, T1, 1], [3, T1, 1], [4, T1, 2],
   [5, T3, 3], [6, T1, 1], [7, T1, 2], [8, T3, 3],
@@ -138,35 +145,37 @@ const taskInfo = async () => ({
 
 let ti = await taskInfo();
 console.log(`  初始：${ti.tabs.join(' ')} · 按钮=${ti.btn} · ${ti.count}`);
-if (ti.btn !== '移动' || ti.count !== '6 块') errors.push(`[任务] 任务一应为"移动/6 块"，实际 ${JSON.stringify(ti)}`);
+if (ti.btn !== '移动木块' || ti.count !== '6 块') errors.push(`[任务] 任务一应为"移动木块/6 块"，实际 ${JSON.stringify(ti)}`);
 
 await student.click('.task-tab[data-task="2"]');
 await student.waitForTimeout(900);
 ti = await taskInfo();
 console.log(`  任务二：${ti.tabs.join(' ')} · 按钮=${ti.btn} · ${ti.count}`);
-if (ti.btn !== '拿走' || ti.count !== '6 块') errors.push(`[任务] 任务二应为"拿走/6 块"，实际 ${JSON.stringify(ti)}`);
+if (ti.btn !== '拿走木块' || ti.count !== '6 块') errors.push(`[任务] 任务二应为"拿走木块/6 块"，实际 ${JSON.stringify(ti)}`);
 
 await student.click('.task-tab[data-task="3"]');
 await student.waitForTimeout(900);
 ti = await taskInfo();
 console.log(`  任务三：${ti.tabs.join(' ')} · 按钮=${ti.btn} · ${ti.count}`);
-if (ti.btn !== '添上' || ti.count !== '3 块') errors.push(`[任务] 任务三应为"添上/3 块"，实际 ${JSON.stringify(ti)}`);
+if (ti.btn !== '添上木块' || ti.count !== '4 块') errors.push(`[任务] 任务三应为"添上木块/4 块"，实际 ${JSON.stringify(ti)}`);
 
 const taskStageBox = await student.locator('#scene').boundingBox();
 
-// 任务三：添一块（3 → 4，正好完成任务三的图形）
+// 任务三：先点「添上木块」，再在空地上添一块（4 → 5）
 let t3cubes = await stateOf(3);
-let pAdd = screenOfCell(taskStageBox, [2, 0, 2], t3cubes);
+let pAdd = screenOfCell(taskStageBox, [4, 0, 4], t3cubes, { ground: true });
 await student.click('#actionBtn');
 await student.waitForTimeout(200);
 await student.mouse.click(pAdd.x, pAdd.y);
 await student.waitForTimeout(900);
 const afterAdd = await stateOf(3);
-console.log(`  任务三添一块：${JSON.stringify(afterAdd)}`);
+console.log(`  任务三添一块：${afterAdd.length} 块`);
 const norm = (a) => JSON.stringify(a.map((c) => c.join(',')).sort());
-if (norm(afterAdd) !== norm([[1, 0, 3], [1, 0, 2], [2, 0, 2], [2, 1, 2]])) {
-  errors.push(`[任务] 任务三添一块后应变成 4 块目标图形（实际 ${JSON.stringify(afterAdd)}）`);
+if (afterAdd.length !== 5 || !afterAdd.some((c) => c[0] === 4 && c[1] === 0 && c[2] === 4)) {
+  errors.push(`[任务] 任务三添一块后应变成 5 块并包含 [4,0,4]（实际 ${JSON.stringify(afterAdd)}）`);
 }
+await student.click('#actionBtn');   // 关掉连续放置，后面用其他工具
+await student.waitForTimeout(200);
 
 // 任务二：拿走一块（6 → 5）
 await student.click('.task-tab[data-task="2"]');
@@ -194,6 +203,10 @@ await student.waitForTimeout(900);
 const selBox = await student.locator('#scene').boundingBox();
 let cubesNow = await stateOf(3);
 
+// 先点亮「移动木块」——没点亮工具之前点方块不会选中（闸门）
+await student.click('#actionBtn');
+await student.waitForTimeout(200);
+
 // 点中一块 → 变橙（挑最高的那块，保证不会被别的方块挡住）
 const pickCell = cubesNow.reduce((best, c) => (c[1] > best[1] ? c : best), cubesNow[0]);
 const pick = screenOfCell(selBox, pickCell, cubesNow);
@@ -203,9 +216,7 @@ const selAfter = await student.locator('#scene').getAttribute('data-selected');
 console.log(`  点中一块：data-selected=${JSON.stringify(selAfter)}`);
 if (selAfter !== pickCell.join(',')) errors.push(`[选中] 点击积木没有选中它（${selAfter}）`);
 
-// 悬停出落点预览 → 点目标格移动
-await student.click('#actionBtn');
-await student.waitForTimeout(200);
+// 悬停出落点预览 → 点目标格移动（已处于移动模式并选中）
 const hoverAt = screenOfCell(selBox, [4, 0, 4], cubesNow, { ground: true });
 await student.mouse.move(selBox.x + 8, selBox.y + 8);   // 先移开，拍基线
 await student.waitForTimeout(350);
@@ -225,42 +236,40 @@ await shot(student, 'student-after-move');
 await student.click('#actionBtn');   // 关掉移动模式，后面的拖动用普通拖拽
 await student.waitForTimeout(200);
 
-// 视角球：按住拖动必须改变画面（平板没有右键，全靠它）
+// 视角球：按住拖动必须改变角度（平板没有右键，全靠它）
 console.log('视角球');
 const pad = await student.locator('#orbitPad').boundingBox();
-const stageEl = student.locator('#stage');
-const stageBox = await stageEl.boundingBox();
-// 只截舞台上半部分：这里没有视角球/复位按钮，能真实反映"相机有没有动"，
-// 又不会把按钮的按下态算进差异里。
-const shotTop = () => student.screenshot({
-  clip: { x: stageBox.x, y: stageBox.y, width: stageBox.width, height: Math.round(stageBox.height * 0.55) },
-});
-const beforePad = await shotTop();
+const angleOf = () => student.evaluate(() => window.cubeView?.() || null);
+const angBefore = await angleOf();
 await student.mouse.move(pad.x + pad.width / 2, pad.y + pad.height / 2);
 await student.mouse.down();
 await student.mouse.move(pad.x + pad.width / 2 + 120, pad.y + pad.height / 2 + 40, { steps: 14 });
 await student.mouse.up();
-// 等 OrbitControls 的阻尼完全停下来，否则"点一下没动"会被误判成视角变了
+// 等 OrbitControls 的阻尼完全停下来再读数
 await student.waitForTimeout(2200);
-const afterPad = await shotTop();
-console.log(`  视角球拖动前后画面：${hash(beforePad)} -> ${hash(afterPad)}`);
-if (hash(beforePad) === hash(afterPad)) errors.push('[视角球] 拖动没有改变视角');
+const angAfter = await angleOf();
+const angKey = (a) => a ? `${a['方位角 θ']}|${a['俯仰角 φ']}` : 'none';
+console.log(`  视角球拖动前后角度：${angKey(angBefore)} -> ${angKey(angAfter)}`);
+if (angKey(angBefore) === angKey(angAfter)) errors.push('[视角球] 拖动没有改变视角');
 await shot(student, 'student-orbit-rotated');
 
-// 点一下视角球不应该回正（回正交给「复位」按钮，避免误触）
-const beforeTap = await shotTop();
+// 点一下视角球不应该回正（回正交给「复位视角」按钮，避免误触）
+const angBeforeTap = await angleOf();
 await student.click('#orbitPad');
-await student.waitForTimeout(1200);
-const afterPadTap = await shotTop();
-console.log(`  点一下视角球：${hash(beforeTap)} -> ${hash(afterPadTap)}（应该不变）`);
-if (hash(afterPadTap) !== hash(beforeTap)) errors.push('[视角球] 点一下竟然改动了视角（应当只有拖动才转）');
+await student.waitForTimeout(1400);
+const angAfterTap = await angleOf();
+console.log(`  点一下视角球角度：${angKey(angBeforeTap)} -> ${angKey(angAfterTap)}（应该不变）`);
+if (angKey(angAfterTap) !== angKey(angBeforeTap)) errors.push('[视角球] 点一下竟然改动了视角（应当只有拖动才转）');
 
-// 「复位」按钮回正
+// 「复位视角」按钮回正
+const angBeforeReset = await angleOf();
 await student.click('#resetView');
 await student.waitForTimeout(900);
-const afterReset = await shotTop();
-console.log(`  点「复位」：${hash(afterPad)} -> ${hash(afterReset)}`);
-if (hash(afterReset) === hash(afterPad)) errors.push('[复位] 点了复位没有回到默认视角');
+const angAfterReset = await angleOf();
+console.log(`  点「复位视角」角度：${angKey(angBeforeReset)} -> ${angKey(angAfterReset)}`);
+if (angKey(angAfterReset) !== '10.0°|80.0°') {
+  errors.push(`[复位] 复位视角没有回到 10°/80°（实际 ${angKey(angAfterReset)}）`);
+}
 
 // 看三视图：一次点开，三个方向同时显示，数字必须等于用服务器真实数据算出的投影
 await student.click('#showViews');
@@ -296,6 +305,8 @@ await student.waitForTimeout(1200);
 const cardStage = teacher.locator('.group-card[data-group="3"] .card-stage');
 const cardBefore = await cardStage.screenshot();
 cubesNow = await stateOf(3);
+await student.click('#actionBtn');   // 开启「移动木块」才能拖动
+await student.waitForTimeout(200);
 const syncBox = await student.locator('#scene').boundingBox();
 const syncTop = cubesNow.reduce((best, c) => (c[1] > best[1] ? c : best), cubesNow[0]);
 const syncFrom = screenOfCell(syncBox, syncTop, cubesNow);
@@ -538,6 +549,8 @@ await post(5, [[2, 0, 2], [2, 1, 2], [2, 2, 2]]);
 const stack = await newPage2();
 await stack.goto(`${BASE}/?group=5`, { waitUntil: 'load' });
 await stack.waitForTimeout(1200);
+await stack.click('#actionBtn');   // 开启「移动木块」才能拖动
+await stack.waitForTimeout(200);
 const stackRect = await stack.locator('#scene').boundingBox();
 const tower = await stateOf(5);
 const topCell = tower[tower.length - 1];
@@ -560,6 +573,8 @@ if (JSON.stringify(afterReload) !== JSON.stringify(movedCubes)) {
 
 console.log('\n回归：键盘把选中的方块挪过去');
 const kbCubes = await stateOf(5);
+await stack.click('#actionBtn');   // 键盘移动也要求先点亮「移动木块」
+await stack.waitForTimeout(200);
 const kbPick = screenOfCell(stackRect, kbCubes[0], kbCubes);
 await stack.mouse.click(kbPick.x, kbPick.y);
 await stack.waitForTimeout(300);
@@ -597,7 +612,7 @@ await stack.close();
 
 // ---------------------------------------------------------------- 收尾
 const T1_CLEAN = [[1, 0, 3], [1, 0, 2], [2, 0, 2], [3, 0, 2], [2, 0, 1], [1, 1, 2]];
-const T3_CLEAN = [[1, 0, 3], [1, 0, 2], [2, 0, 2]];
+const T3_CLEAN = [[1, 0, 3], [1, 0, 2], [2, 0, 2], [2, 1, 2]];
 for (let i = 1; i <= 8; i++) {
   await post(i, T1_CLEAN, 1);
   await post(i, T1_CLEAN, 2);

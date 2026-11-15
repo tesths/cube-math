@@ -17,14 +17,14 @@ export const LIMITS = Object.freeze({ sizeX: 5, sizeY: 5, sizeZ: 5 });
 
 /**
  * 三个任务，每个任务对应一种操作：
- *   任务一 = 移动（方块数量不变）
- *   任务二 = 拿走（只会减少）
- *   任务三 = 添上（只会增加）
+ *   任务一 = 移动木块（方块数量不变）
+ *   任务二 = 拿走木块（只会减少）
+ *   任务三 = 添上木块（只会增加）
  */
 export const TASKS = Object.freeze({
-  1: { id: 1, name: '任务一', action: 'move', actionLabel: '移动' },
-  2: { id: 2, name: '任务二', action: 'erase', actionLabel: '拿走' },
-  3: { id: 3, name: '任务三', action: 'place', actionLabel: '添上' },
+  1: { id: 1, name: '任务一', action: 'move', actionLabel: '移动木块' },
+  2: { id: 2, name: '任务二', action: 'erase', actionLabel: '拿走木块' },
+  3: { id: 3, name: '任务三', action: 'place', actionLabel: '添上木块' },
 });
 
 export const TASK_COUNT = 3;
@@ -59,13 +59,13 @@ const FIGURE_A = [
 ];
 
 /*
- * 任务三（完成态）的第一层：
+ * 任务三（初始摆放 = 完成态，4 块）的第一层：
  *   1 0 0      →  (1,0,3)   最前面一行左边一块
  *   1 1 0      →  (1,0,2) (2,0,2)
  *   0 0 0
  * 第二层：
  *   0 0 0
- *   0 1 0      →  (2,1,2)   只有最中间一块
+ *   0 1 0      →  (2,1,2)   5×5 正中间那格再叠一块
  *   0 0 0
  */
 const FIGURE_B = [
@@ -73,10 +73,10 @@ const FIGURE_B = [
   [2, 1, 2],
 ];
 
-/** 某任务的"初始摆放"（任务三比完成态少最后一块，学生添上它就完成） */
+/** 某任务的"初始摆放"（任务三初始就是完整 4 块，含正中间上方那一块） */
 export function taskInitial(value) {
   const id = normalizeTask(value);
-  if (id === 3) return FIGURE_B.filter(([x, y, z]) => !(x === 2 && y === 1 && z === 2));
+  if (id === 3) return FIGURE_B.map((c) => [...c]);
   return FIGURE_A.map((c) => [...c]);
 }
 
