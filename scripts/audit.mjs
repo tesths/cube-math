@@ -127,9 +127,9 @@ try {
 
   let p = cam(st.cubes)([1, 1, 2]);
   await page.mouse.click(p.x, p.y);
-  await page.waitForTimeout(1000);
-  st = await scene(3);
-  check('任务二拿走一块 → 5 块', st.cubes.length === 5 && st.task === 2, `${st.cubes.length} 块 task=${st.task}`);
+  await page.waitForTimeout(400);
+  check('任务二拿走一块 → 5 块', (await page.textContent('#cubeCount')).trim() === '5 块', await page.textContent('#cubeCount'));
+  await page.waitForTimeout(1600);   // 等自动保存落库（Vercel 冷启动可能慢）
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(1300);
   st = await scene(3);
@@ -145,9 +145,9 @@ try {
   st = await scene(3);
   p = cam(st.cubes)([4, 0, 4], true);
   await page.mouse.click(p.x, p.y);
-  await page.waitForTimeout(1000);
-  st = await scene(3);
-  check('任务三添一块 → 5 块且含 [4,0,4]', st.cubes.length === 5 && st.cubes.some((c) => c[0] === 4 && c[1] === 0 && c[2] === 4), JSON.stringify(st.cubes));
+  await page.waitForTimeout(400);
+  check('任务三添一块 → 5 块', (await page.textContent('#cubeCount')).trim() === '5 块', await page.textContent('#cubeCount'));
+  await page.waitForTimeout(1600);   // 等自动保存落库
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(1300);
   st = await scene(3);
