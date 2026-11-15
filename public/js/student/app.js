@@ -7,7 +7,7 @@
 import { CubeStage } from './stage.js';
 import { ViewPanel } from './views.js';
 import { sanitizeLoose, collapseColumns, taskInitial, taskMeta, normalizeTask } from '../shared/model.js';
-import { openStateStream, saveGroup, saveGroupBeacon, fetchState } from '../shared/net.js';
+import { openStateStream, saveGroup, saveGroupBeacon, fetchState, fetchSettings } from '../shared/net.js';
 
 const GROUP_COUNT = 8;
 const LS_KEY = 'cube-views:group';
@@ -141,6 +141,28 @@ function readViewMode() {
   } catch {
     return 'formal';
   }
+}
+
+function writeViewMode(mode) {
+  try {
+    localStorage.setItem(LS_MODE, mode === 'training' ? 'training' : 'formal');
+  } catch { /* 存不了就算，本次会话仍按服务器设置 */ }
+}
+
+/**
+ * 决定显示模式：**优先服务器全局设置**（教师在自己电脑上设置的），
+ * 失败（离线/无后端）再退回本机 localStorage。
+ * 这是关键：教师电脑和学生平板是两台设备，只有服务器能让设置“传过去”。
+ */
+async function resolveViewMode() {
+  try {
+    const s = await fetchSettings();
+    if (s?.mode === 'training' || s?.mode === 'formal') {
+      writeViewMode(s.mode);
+      return s.mode;
+    }
+  } catch { /* 退回本机 */ }
+  return readViewMode();
 }
 
 /** 任务0（练习）的本地进度；坏了就回初始图形 */
@@ -650,7 +672,7 @@ function connectStream() {
 
 async function boot() {
   setStatus('loading', '连接中…');
-  app.viewMode = readViewMode();
+  app.viewMode = await resolveViewMode();
 
   // 练习模式：只显示任务0，本地练习，不需要/不影响任何组的正式数据（也不连服务器）
   if (app.viewMode === 'training') {

@@ -77,8 +77,30 @@ const MIME = {
   '.ico': 'image/x-icon',
 };
 
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, If-None-Match',
+  'Access-Control-Expose-Headers': 'ETag',
+};
+let settingsMode = 'formal';
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, BASE);
+  for (const [k, v] of Object.entries(CORS)) res.setHeader(k, v);
+  if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+  if (url.pathname === '/api/settings') {
+    if (req.method === 'POST') {
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      const b = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+      settingsMode = b.mode === 'training' ? 'training' : 'formal';
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(JSON.stringify({ mode: settingsMode, updatedAt: Date.now() }));
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(JSON.stringify({ mode: settingsMode, updatedAt: 0 }));
+  }
 
   if (url.pathname === '/api/events') {
     stats.events204 += 1;
@@ -228,17 +250,23 @@ console.log('\n场景二：SSE 连上了但不推数据（应当自动降级为�
 
 let hangRequests = { state: 0, events: 0 };
 const hangGroups = Array.from({ length: 8 }, (_, i) => mkGroup(i));
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, If-None-Match',
-  'Access-Control-Expose-Headers': 'ETag',
-};
 const hangServer = http.createServer(async (req, res) => {
   const url = new URL(req.url, BASE);
   if (req.method === 'OPTIONS') {
     res.writeHead(204, CORS);
     return res.end();
+  }
+  if (url.pathname === '/api/settings') {
+    if (req.method === 'POST') {
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      const b = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+      settingsMode = b.mode === 'training' ? 'training' : 'formal';
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+      return res.end(JSON.stringify({ mode: settingsMode, updatedAt: Date.now() }));
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
+    return res.end(JSON.stringify({ mode: settingsMode, updatedAt: 0 }));
   }
   if (url.pathname === '/api/events') {
     hangRequests.events += 1;

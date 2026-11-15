@@ -1,13 +1,15 @@
 /**
- * 设置页（教师专属）：选择这台设备显示「任务0（练习）」还是「任务1·2·3（正式）」。
+ * 设置页（教师专属）：选择所有设备显示「任务0（练习）」还是「任务1·2·3（正式）」。
  *
- * - 先要通过教师口令（config.js 里的 settingsPin）才能看到选项，学生即使知道网址也进不来；
- * - 选项只存在本机 localStorage，不改服务器数据；返回学生端后生效（学生端读同一个 key）。
- * - 默认 formal（保持原有行为）。
+ * - 先通过教师口令（config.js 的 settingsPin）才能看到选项；
+ * - 选项写到**服务器**（/api/settings），所以教师电脑上设置，学生平板刷新就生效；
+ *   同时写一份本机 localStorage 作为离线兜底。
+ * - 默认 formal。
  *
- * 说明：这是纯前端口令门，用于挡住学生误入/乱点，不是强安全措施；
- * 需要改口令就改 config.js 的 settingsPin（部署后无需重新构建）。
+ * 这是纯前端口令门，用于挡住学生误入/乱点，不是强安全措施。
  */
+import { fetchSettings, saveSettings } from './shared/net.js';
+
 const KEY = 'cube-views:mode';
 const PIN = String(globalThis.CUBE_VIEWS_CONFIG?.settingsPin ?? '8888');
 
@@ -19,7 +21,9 @@ const lockNote = document.getElementById('lockNote');
 const note = document.getElementById('settingsNote');
 const choices = [...document.querySelectorAll('.settings-choice')];
 
-function current() {
+let currentMode = 'formal';
+
+function localMode() {
   try {
     return localStorage.getItem(KEY) === 'training' ? 'training' : 'formal';
   } catch {
@@ -27,22 +31,39 @@ function current() {
   }
 }
 
+function writeLocal(mode) {
+  try {
+    localStorage.setItem(KEY, mode);
+  } catch { /* 忽略 */ }
+}
+
 function label(mode) {
   return mode === 'training' ? '任务 0（练习模式）' : '任务 1·2·3（正式任务）';
 }
 
 function render() {
-  const mode = current();
   for (const btn of choices) {
-    btn.setAttribute('aria-pressed', String(btn.dataset.mode === mode));
+    btn.setAttribute('aria-pressed', String(btn.dataset.mode === currentMode));
   }
-  note.textContent = `当前：${label(mode)}`;
+  note.textContent = `当前：${label(currentMode)}`;
+}
+
+/** 从服务器读取当前设置（读不到就用本机） */
+async function load() {
+  let mode = localMode();
+  try {
+    const s = await fetchSettings();
+    if (s?.mode === 'training' || s?.mode === 'formal') mode = s.mode;
+  } catch { /* 服务器不可用，用本机 */ }
+  currentMode = mode;
+  writeLocal(mode);
+  render();
 }
 
 function unlock() {
   lockEl.hidden = true;
   bodyEl.hidden = false;
-  render();
+  load();
   document.querySelector('.settings-choice')?.focus();
 }
 
@@ -58,18 +79,19 @@ form.addEventListener('submit', (event) => {
 });
 
 for (const btn of choices) {
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', async () => {
     const mode = btn.dataset.mode === 'training' ? 'training' : 'formal';
-    try {
-      localStorage.setItem(KEY, mode);
-    } catch {
-      note.textContent = '这台设备无法保存设置（浏览器禁用了本地存储）';
-      return;
-    }
+    currentMode = mode;
+    writeLocal(mode);
     render();
-    note.textContent = `已保存 ✓ 当前：${label(mode)}，返回学生端后生效`;
+    note.textContent = '正在保存到服务器…';
+    try {
+      await saveSettings(mode);
+      note.textContent = `已保存到服务器 ✓ 当前：${label(mode)}（学生端刷新即生效）`;
+    } catch (err) {
+      note.textContent = `保存到服务器失败：${err.message}（已在本机生效）`;
+    }
   });
 }
 
-// 进入页面时只显示口令门（不持久化解锁，学生拿到设备也进不去）
 pinInput.focus();

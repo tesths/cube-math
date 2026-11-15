@@ -210,3 +210,28 @@ export async function fetchState() {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+/** 读全局设置（含 mode：training / formal）。 */
+export async function fetchSettings() {
+  const res = await fetch(apiUrl('/api/settings'), { cache: 'no-store' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+/** 写全局设置（教师端设置页用）。 */
+export async function saveSettings(mode) {
+  const res = await fetch(apiUrl('/api/settings'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode }),
+  });
+  if (!res.ok) {
+    let message = `保存失败（HTTP ${res.status}）`;
+    try {
+      const body = await res.json();
+      if (body?.error) message = body.error;
+    } catch { /* 保留默认信息 */ }
+    throw new Error(message);
+  }
+  return res.json();
+}

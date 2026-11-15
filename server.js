@@ -21,7 +21,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { sanitizeCubes, validateCubes, LIMITS } from './public/js/shared/model.js';
-import { createStore, GROUP_COUNT, storeKind } from './lib/store.js';
+import { createStore, GROUP_COUNT, storeKind, normalizeMode } from './lib/store.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(ROOT, 'public');
@@ -190,6 +190,29 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === '/api/state' && req.method === 'GET') {
       return json(res, 200, await snapshot());
+    }
+
+    if (pathname === '/api/settings') {
+      if (req.method === 'GET') {
+        return json(res, 200, await store.getSettings());
+      }
+      if (req.method === 'POST') {
+        const raw = await readBody(req);
+        let body = {};
+        if (raw.trim()) {
+          try {
+            body = JSON.parse(raw);
+          } catch {
+            return json(res, 400, { error: 'JSON 解析失败' });
+          }
+        }
+        if (body?.mode !== 'training' && body?.mode !== 'formal') {
+          return json(res, 400, { error: "mode 只能是 'training' 或 'formal'" });
+        }
+        const next = await store.setSettings(normalizeMode(body.mode));
+        return json(res, 200, next);
+      }
+      return json(res, 405, { error: 'method not allowed' });
     }
 
     if (pathname === '/api/events' && req.method === 'GET') {

@@ -674,10 +674,13 @@ await rule.close();
 
 // 回归：练习模式（任务0）只有任务0，三个工具 + 重置可用
 console.log('\n回归：练习模式（任务0）');
+// 设置是服务器全局的：先让服务器进入练习模式，学生端刷新就会只显示任务0
+await fetch(`${BASE}/api/settings`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'training' }),
+});
 const trainCtx = await browser2.newContext({ viewport: { width: 1400, height: 880 }, locale: 'zh-CN' });
 await trainCtx.addInitScript(() => {
   try {
-    localStorage.setItem('cube-views:mode', 'training');
     localStorage.removeItem('cube-views:group');
     localStorage.removeItem('cube-views:task0');
   } catch { /* ignore */ }
@@ -699,6 +702,10 @@ await tpage.click('#resetBtn'); await tpage.waitForTimeout(300);
 if ((await tpage.textContent('#cubeCount')).trim() !== '4 块') errors.push('[练习] 重置应回到 4 块');
 await tpage.close();
 await trainCtx.close();
+// 测试完把服务器设置恢复成正式任务，避免影响后续/线上
+await fetch(`${BASE}/api/settings`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'formal' }),
+});
 
 // ---------------------------------------------------------------- 收尾
 const T1_CLEAN = [[1, 0, 3], [1, 0, 2], [2, 0, 2], [3, 0, 2], [2, 0, 1], [1, 1, 2]];
