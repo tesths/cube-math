@@ -143,11 +143,11 @@ try {
   await page.click('#actionBtn');
   await page.waitForTimeout(200);
   st = await scene(3);
-  p = cam(st.cubes)([0, 0, 0], true);
+  p = cam(st.cubes)([4, 0, 4], true);
   await page.mouse.click(p.x, p.y);
   await page.waitForTimeout(1000);
   st = await scene(3);
-  check('任务三添一块 → 5 块且含 [0,0,0]', st.cubes.length === 5 && st.cubes.some((c) => c[0] === 0 && c[1] === 0 && c[2] === 0), JSON.stringify(st.cubes));
+  check('任务三添一块 → 5 块且含 [4,0,4]', st.cubes.length === 5 && st.cubes.some((c) => c[0] === 4 && c[1] === 0 && c[2] === 4), JSON.stringify(st.cubes));
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(1300);
   st = await scene(3);
@@ -250,12 +250,12 @@ try {
   })();
   const topCube = s2.cubes.reduce((b, c) => (c[1] > b[1] ? c : b), s2.cubes[0]);
   const fromPt = syncCam(topCube);
-  const toPt = syncCam([0, 0, 4], true);
+  const toPt = syncCam([4, 0, 4], true);
   await page.mouse.move(fromPt.x, fromPt.y);
   await page.mouse.down();
   await page.mouse.move(toPt.x, toPt.y, { steps: 10 });
   await page.mouse.up();
-  await page.waitForTimeout(2800);
+  await page.waitForTimeout(6000);   // Vercel 无 SSE，教师端靠 2 秒轮询，留足一轮刷新
   const cardB = await cardStage.screenshot();
   check('学生改动后教师端自动更新', hash(cardA) !== hash(cardB), `${hash(cardA)} -> ${hash(cardB)}`);
 
