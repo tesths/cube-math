@@ -14,4 +14,7 @@
 window.CUBE_VIEWS_CONFIG = {
   apiBase: '',
   pollMs: 1000,
+  // 设置页的教师口令（教师端「设置」进 /settings 时输入）。学生不知道就进不去。
+  // 这是纯前端口令门，用来挡住学生误入，不是强安全；需要就改这里，部署后即时生效。
+  settingsPin: '8888',
 };

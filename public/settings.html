@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>设置 · 正方体三视图</title>
-<meta name="description" content="选择这台设备显示任务0（练习）还是任务1·2·3（正式）。">
+<meta name="description" content="教师专属设置：选择这台设备显示任务0（练习）还是任务1·2·3（正式）。">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="stylesheet" href="/css/style.css">
 <script src="/config.js"></script>
@@ -12,25 +12,39 @@
 <body class="settings-page">
 <main class="settings" aria-labelledby="settingsTitle">
   <h1 id="settingsTitle">设置</h1>
-  <p class="settings-lede">
-    选择这台设备显示哪些任务。<strong>任务0</strong> 是让孩子先熟悉平板操作（移动 / 拿走 / 添上 / 重置都能试），
-    看不到正式任务；正式上课选 <strong>任务 1·2·3</strong>。
-  </p>
 
-  <div class="settings-choices" role="group" aria-label="选择显示的任务">
-    <button class="settings-choice" type="button" data-mode="training" aria-pressed="false">
-      <strong>任务 0</strong>
-      <span>只显示任务0 · 熟悉平板用（练习，不计入正式数据）</span>
-    </button>
-    <button class="settings-choice" type="button" data-mode="formal" aria-pressed="false">
-      <strong>任务 1·2·3</strong>
-      <span>只显示正式任务 · 上课用</span>
-    </button>
-  </div>
+  <!-- 教师口令门：学生即使知道网址也进不来 -->
+  <section id="settingsLock">
+    <p class="settings-lede">教师专属设置，请输入口令。</p>
+    <form id="settingsForm" class="settings-form" autocomplete="off">
+      <input id="settingsPin" type="text" inputmode="numeric" autocomplete="off"
+             placeholder="请输入教师口令" aria-label="教师口令">
+      <button class="btn btn-primary" type="submit">进入</button>
+    </form>
+    <p class="settings-note" id="lockNote" role="status" aria-live="polite"></p>
+    <a class="btn settings-back" href="/">← 返回学生端</a>
+  </section>
 
-  <p class="settings-note" id="settingsNote" role="status" aria-live="polite"></p>
+  <section id="settingsBody" hidden>
+    <p class="settings-lede">
+      选择这台设备显示哪些任务。<strong>任务0</strong> 是让孩子先熟悉平板操作（移动 / 拿走 / 添上 / 重置都能试），
+      看不到正式任务；正式上课选 <strong>任务 1·2·3</strong>。
+    </p>
 
-  <a class="btn settings-back" href="/">← 返回学生端</a>
+    <div class="settings-choices" role="group" aria-label="选择显示的任务">
+      <button class="settings-choice" type="button" data-mode="training" aria-pressed="false">
+        <strong>任务 0</strong>
+        <span>只显示任务0 · 熟悉平板用（练习，不计入正式数据）</span>
+      </button>
+      <button class="settings-choice" type="button" data-mode="formal" aria-pressed="false">
+        <strong>任务 1·2·3</strong>
+        <span>只显示正式任务 · 上课用</span>
+      </button>
+    </div>
+
+    <p class="settings-note" id="settingsNote" role="status" aria-live="polite"></p>
+    <a class="btn settings-back" href="/">← 返回学生端</a>
+  </section>
 </main>
 
 <script type="module" src="/js/settings.js"></script>

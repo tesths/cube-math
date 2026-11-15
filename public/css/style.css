@@ -1113,3 +1113,30 @@ body.is-focusing { overflow: hidden; }
 @media (max-width: 640px) {
   .settings-choices { grid-template-columns: 1fr; }
 }
+
+/* 设置页教师口令门 */
+.settings-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.settings-form input {
+  flex: 1 1 220px;
+  min-height: 52px;
+  padding: 0 14px;
+  font-size: 18px;
+  letter-spacing: .18em;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--panel-alt);
+  border: 2px solid var(--line);
+  border-radius: 12px;
+}
+.settings-form input:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(140, 90, 43, .12);
+}
+.settings-form .btn { min-height: 52px; padding: 0 22px; }
