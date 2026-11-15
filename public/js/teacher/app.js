@@ -364,7 +364,8 @@ function refreshFocus(state) {
   const cubes = cloneCubes(g.tasks?.[task] ?? taskInitial(task));
 
   // 老师刚改过（还没保存完）时，不要被服务器回声覆盖
-  if (focus.dirty || focus.saving || Date.now() - focus.lastEditAt < 900) return;
+  // 正在用工具 / 有未保存改动 / 刚改过：不要拿远端状态覆盖（包括任务被切走）
+  if (focus.mode !== 'none' || focus.dirty || focus.saving || Date.now() - focus.lastEditAt < 900) return;
 
   if (task !== focus.task) {
     focus.task = task;

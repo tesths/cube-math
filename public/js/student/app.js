@@ -469,22 +469,18 @@ function applyState(state) {
   if (!mine) return;
   const remoteTask = normalizeTask(mine.task);
 
-  // 本地有没保存成功的改动时（dirty），绝不拿服务器旧数据覆盖学生的成果
+  // 本机有未保存改动 / 正在保存 / 刚操作过：完全不同步，避免覆盖学生成果
   const recentlyEdited = app.dirty || app.saving || Date.now() - app.lastEditAt < ADOPT_REMOTE_AFTER;
   if (recentlyEdited) return;
 
+  // ⚠ 任务以本机为准，绝不根据服务器上的 task 自动切换本机任务。
+  // 以前只要同组有另一个写入方（另一个标签页 / 另一台设备 / 教师放大演示里点重置）
+  // 把服务器 task 写成别的值，正在摆放的这台就会在停手 1.2 秒后被拉走
+  // （任务三放到一半突然跳回任务一）。一台设备只服务一个组、任务由本机学生选择，
+  // 所以服务器 task 只在“首次进入该组”时读取，运行中不跟随。
+  // 只同步“本机当前任务这一槽”的方块（这样别人改当前任务的图形仍能看到）。
   app.tasks = cloneTasks(mine.tasks);
-  const remote = app.tasks[remoteTask] ?? taskInitial(remoteTask);
-
-  // 别的设备（或老师放大演示时）改了任务或方块：跟着更新
-  if (remoteTask !== app.task) {
-    app.task = remoteTask;
-    app.cubes = pipeline(remote);
-    renderTaskUi();
-    renderLocal();
-    return;
-  }
-
+  const remote = app.tasks[app.task] ?? taskInitial(app.task);
   if (!sameCubes(remote, app.cubes)) {
     app.cubes = pipeline(remote);
     app.tasks[app.task] = app.cubes;

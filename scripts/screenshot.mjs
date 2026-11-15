@@ -610,6 +610,30 @@ await fiveTall.close();
 
 await stack.close();
 
+// 回归：同组另一个标签页切任务，不能把正在摆放的这台带走（任务跳转 bug）
+console.log('\n回归：同组另一个标签切任务，不会把正在摆放的这台带走');
+const jumpA = await newPage2();
+await jumpA.goto(`${BASE}/?group=4`, { waitUntil: 'load' });
+await jumpA.waitForTimeout(1000);
+await jumpA.click('.task-tab[data-task="3"]');
+await jumpA.waitForTimeout(900);
+await jumpA.click('#actionBtn');           // 任务三进入「连续放置」
+await jumpA.waitForTimeout(300);
+const jumpBefore = (await jumpA.locator('.task-tab[aria-pressed="true"]').textContent()).trim();
+const jumpB = await newPage2();
+await jumpB.goto(`${BASE}/?group=4`, { waitUntil: 'load' });
+await jumpB.waitForTimeout(1000);
+await jumpB.click('.task-tab[data-task="1"]');   // 另一个标签页切到任务一（会写服务器 task=1）
+await jumpB.waitForTimeout(2200);
+const jumpAfter = (await jumpA.locator('.task-tab[aria-pressed="true"]').textContent()).trim();
+const jumpCount = (await jumpA.textContent('#cubeCount')).trim();
+console.log(`  摆放中的 A：${jumpBefore} → ${jumpAfter}，块数 ${jumpCount}`);
+if (jumpBefore !== '任务三' || jumpAfter !== '任务三') {
+  errors.push(`[跳转] 同组另一个标签切任务，把正在摆放的 A 带走了（${jumpBefore} → ${jumpAfter}）`);
+}
+await jumpB.close();
+await jumpA.close();
+
 // ---------------------------------------------------------------- 收尾
 const T1_CLEAN = [[1, 0, 3], [1, 0, 2], [2, 0, 2], [3, 0, 2], [2, 0, 1], [1, 1, 2]];
 const T3_CLEAN = [[1, 0, 3], [1, 0, 2], [2, 0, 2], [2, 1, 2]];
