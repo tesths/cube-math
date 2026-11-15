@@ -11,6 +11,8 @@ import { openStateStream, saveGroup, saveGroupBeacon, fetchState } from '../shar
 
 const GROUP_COUNT = 8;
 const LS_KEY = 'cube-views:group';
+const LS_MODE = 'cube-views:mode';        // 'training'(只显示任务0) | 'formal'(任务1·2·3)
+const LS_TASK0 = 'cube-views:task0';      // 任务0（练习）的本地进度，不写服务器
 const SAVE_DEBOUNCE = 350;
 const ADOPT_REMOTE_AFTER = 1200;   // 自己刚改完的这段时间内忽略服务器回声，免得和手速打架
 
@@ -22,7 +24,8 @@ const els = {
   groupLabel: $('groupLabel'),
   status: $('status'),
   statusText: $('statusText'),
-  actionBtn: $('actionBtn'),
+  toolModes: $('toolModes'),
+  toolButtons: [...document.querySelectorAll('.tool-mode-btn')],
   toolStep: $('toolStep'),
   resetBtn: $('resetBtn'),
   taskTabs: $('taskTabs'),
@@ -56,20 +59,23 @@ const app = {
   dirty: false,
   retries: 0,
   lastEditAt: 0,
-  task: 1,               // 1=移动 2=拿走 3=添上
-  tasks: {},             // 三个任务各自的进度（切任务不丢）
+  viewMode: 'formal',    // 'formal' | 'training'（设置页切换）
+  task: 1,               // 0=练习（本地） 1=移动 2=拿走 3=添上
+  tasks: {},             // 任务1/2/3 各自的进度（切任务不丢）
   mode: 'none',          // 'none' | 'move' | 'erase' | 'place'
 };
 
 const TOOL_TIPS = {
-  move: '先点「移动木块」按钮，才能点木块；点中一块再点目标格子就能挪过去，也可以直接拖动。「重置木块」回到这个任务最初的样子。',
+  zero: '任务0：先点一个工具按钮（移动 / 拿走 / 添上），再操作木块。三个都试一试，熟悉一下平板。「重置木块」回到最初的样子。',
+  move: '先点「移动木块」按钮，才能点木块；点中一块再点目标格子就能挪过去，也可以直接拖动。移好后点一下「移动木块」结束。「重置木块」回到这个任务最初的样子。',
   erase: '先点「拿走木块」按钮，才能点木块；点任意木块就把它拿走，上面的木块会自动落下。「重置木块」回到这个任务最初的样子。',
   place: '先点「添上木块」按钮，才能加木块；点木块顶面或空格子就能添一块，再点一次按钮或按 Esc 结束。「重置木块」回到这个任务最初的样子。',
 };
 
 /** 两步引导：没点亮工具时提示「先点按钮」，点亮后提示「现在怎么操作」 */
 const GUIDES = {
-  move:  { idle: '① 先点左边「移动木块」按钮',   active: '② 点中一块，再点目标格子（或直接拖动）' },
+  zero:  { idle: '① 先点一个工具按钮（移动 / 拿走 / 添上）', active: '② 现在去舞台里操作木块（再点按钮可换工具）' },
+  move:  { idle: '① 先点左边「移动木块」按钮',   active: '② 点中一块 → 点目标格子；移好后点「移动木块」结束' },
   erase: { idle: '① 先点左边「拿走木块」按钮',   active: '② 点任意木块，就把它拿走' },
   place: { idle: '① 先点「添上木块」按钮',       active: '② 点木块顶面或空格子，就能添一块' },
 };
@@ -77,10 +83,16 @@ const GUIDES = {
 let guideTimer = null;
 
 const KB_TIPS = {
+  zero: '方向键选格子 · 按当前工具操作',
   move: '方向键选格子 · 回车把选中的木块挪过去',
   erase: '方向键选格子 · Delete 拿走那一列最上面一块',
   place: '方向键选格子 · 回车添一块',
 };
+
+/** 当前任务对应的工具栏/引导 key（任务0 用 zero） */
+function guideKey() {
+  return app.task === 0 ? 'zero' : taskMeta(app.task).action;
+}
 
 // ------------------------------------------------------------------ 工具
 
@@ -122,6 +134,30 @@ function clearBound() {
   }
 }
 
+/** 设置页选择的模式；默认 formal（保持原有行为） */
+function readViewMode() {
+  try {
+    return localStorage.getItem(LS_MODE) === 'training' ? 'training' : 'formal';
+  } catch {
+    return 'formal';
+  }
+}
+
+/** 任务0（练习）的本地进度；坏了就回初始图形 */
+function readTask0() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LS_TASK0) || 'null');
+    if (Array.isArray(raw) && raw.length) return pipeline(raw);
+  } catch { /* 忽略坏数据 */ }
+  return taskInitial(0);
+}
+
+function saveTask0(cubes) {
+  try {
+    localStorage.setItem(LS_TASK0, JSON.stringify(cubes));
+  } catch { /* 存不了就算，本次会话仍可练 */ }
+}
+
 function sameCubes(a, b) {
   if (a.length !== b.length) return false;
   const setB = new Set(b.map(key));
@@ -137,15 +173,19 @@ function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString('zh-CN', { hour12: false });
 }
 
-/** 没先点工具按钮就点木块 / 按键盘：弹一条提醒，并把按钮再闪一下 */
+/** 没先点工具按钮就点木块 / 按键盘：弹一条提醒，并把工具按钮再闪一下 */
 function showGuideReminder(message) {
-  const label = taskMeta(app.task).actionLabel;
-  els.guideToast.textContent = message ?? `先点左边的「${label}」按钮，再操作木块`;
+  const fallback = app.task === 0
+    ? '先点一个工具按钮（移动 / 拿走 / 添上），再操作木块'
+    : `先点左边的「${taskMeta(app.task).actionLabel}」按钮，再操作木块`;
+  els.guideToast.textContent = message ?? fallback;
   els.guideToast.hidden = false;
 
-  els.actionBtn.classList.remove('nudge');
-  void els.actionBtn.offsetWidth;      // 强制重排，让动画每次都能重新播放
-  els.actionBtn.classList.add('nudge');
+  for (const btn of visibleToolButtons()) {
+    btn.classList.remove('nudge');
+    void btn.offsetWidth;      // 强制重排，让动画每次都能重新播放
+    btn.classList.add('nudge');
+  }
   clearTimeout(guideTimer);
   guideTimer = setTimeout(hideGuideReminder, 2600);
 }
@@ -154,7 +194,12 @@ function hideGuideReminder() {
   clearTimeout(guideTimer);
   guideTimer = null;
   els.guideToast.hidden = true;
-  els.actionBtn.classList.remove('nudge');
+  for (const btn of els.toolButtons) btn.classList.remove('nudge');
+}
+
+/** 当前任务下显示哪些工具按钮 */
+function visibleToolButtons() {
+  return els.toolButtons.filter((btn) => !btn.hidden);
 }
 
 /**
@@ -239,6 +284,7 @@ function enterGroup(n) {
 
   const mine = app.serverGroups.get(n);
   app.task = normalizeTask(mine?.task);
+  if (!taskAllowed(app.task)) app.task = 1;   // 正式模式只允许 1/2/3
   app.tasks = cloneTasks(mine?.tasks);
   const initial = app.tasks[app.task] ?? taskInitial(app.task);
   app.cubes = pipeline(initial);
@@ -264,14 +310,18 @@ function unbind() {
 
 function initWorkspace() {
   app.stage = new CubeStage(els.scene, {
-    onPlace: (pos) => commit([...app.cubes, pos]),
+    onPlace: (pos) => handlePlace(pos),
     onMove: (from, to) => {
       const next = app.cubes.filter((c) => key(c) !== key(from));
       next.push(to);
       commit(next);
       app.stage.setSelected(to);   // 挪完继续选中新位置，便于连续调整
+      if (app.task === 1) {
+        // 任务1：及时提示「再点按钮，移动结束」
+        showGuideReminder('已移动木块 · 再点一下「移动木块」结束移动');
+      }
     },
-    onDelete: (pos) => commit(app.cubes.filter((c) => key(c) !== key(pos))),
+    onDelete: (pos) => handleDelete(pos),
     onPlacingChange: () => { /* 放置状态由 app.mode 驱动，界面在 syncModeButtons 里同步 */ },
     onKeyboardModeChange: (on) => {
       els.kbHint.hidden = !on;
@@ -293,17 +343,25 @@ function initWorkspace() {
   app.stage.attachOrbitPad(els.orbitPad);
   els.resetView.addEventListener('click', () => app.stage.resetView());
 
-  // 左侧动作按钮，内容随任务变化：移动木块 / 拿走木块 / 添上木块；再点一次收起工具
-  els.actionBtn.addEventListener('click', () => {
-    const action = taskMeta(app.task).action;
-    setMode(app.mode === action ? 'none' : action);
-  });
+  // 工具按钮：任务0 三个都在；任务1/2/3 只显示对应那一个。再点一次收起工具。
+  for (const btn of els.toolButtons) {
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.mode;
+      if (action === 'place' && isPlaceLocked()) {
+        showGuideReminder('任务三只能添加一个木块；要重新来请点「重置木块」');
+        return;
+      }
+      setMode(app.mode === action ? 'none' : action);
+    });
+  }
 
-  // 「重置」= 回到当前任务最初的摆放
+  // 「重置」= 回到当前任务最初的摆放（同时解锁任务3、清掉粉色高亮）
   els.resetBtn.addEventListener('click', () => {
     setMode('none');
     app.stage.setSelected(null);
+    app.stage.setHighlight(null);
     commit(taskInitial(app.task));
+    renderTaskUi();               // 重置后刷新按钮（任务3 的"添上"解锁）
     setStatus('saved', '已重置');
   });
 
@@ -324,6 +382,37 @@ function initWorkspace() {
   });
 }
 
+/** 任务3 是否已经添加过一块（用于锁定"添上"按钮） */
+function isPlaceLocked() {
+  return app.task === 3 && app.cubes.length - taskInitial(3).length >= 1;
+}
+
+/** 放置（任务3 只允许添加一块，加完标粉并锁定） */
+function handlePlace(pos) {
+  if (isPlaceLocked()) {
+    showGuideReminder('任务三只能添加一个木块；要重新来请点「重置木块」');
+    setMode('none');
+    return;
+  }
+  const before = new Set(app.cubes.map(key));
+  commit([...app.cubes, pos]);
+  if (app.task === 3 && !before.has(key(pos))) {
+    app.stage.setHighlight(pos);      // 新添的积木标粉
+    setMode('none');                  // 加完就结束连续放置
+    renderTaskUi();                   // 锁定「添上」按钮
+    setStatus('saved', '已添上一块 · 需要「重置木块」才能再添');
+  }
+}
+
+/** 拿走（任务2 只允许拿走一块） */
+function handleDelete(pos) {
+  if (app.task === 2 && taskInitial(2).length - app.cubes.length >= 1) {
+    showGuideReminder('任务二只能拿走一个木块；要重新来请点「重置木块」');
+    return;
+  }
+  commit(app.cubes.filter((c) => key(c) !== key(pos)));
+}
+
 /** 三个工具互斥：同一时刻只有一个生效（move / erase / place） */
 function setMode(mode) {
   app.mode = mode;
@@ -335,45 +424,83 @@ function setMode(mode) {
 }
 
 function syncModeButtons() {
+  const gk = guideKey();
   const action = taskMeta(app.task).action;
-  const active = app.mode === action;
-  els.actionBtn.setAttribute('aria-pressed', String(active));
+  const task0 = app.task === 0;
+  const active = task0 ? app.mode !== 'none' : app.mode === action;
+  const locked = isPlaceLocked();
+  const placeBtn = els.toolButtons.find((b) => b.dataset.mode === 'place');
+
+  for (const btn of els.toolButtons) {
+    btn.setAttribute('aria-pressed', String(app.mode === btn.dataset.mode));
+  }
   els.stage.dataset.moving = String(app.mode === 'move');
   els.stage.dataset.erasing = String(app.mode === 'erase');
   els.stage.dataset.placing = String(app.mode === 'place');
   els.placingHint.hidden = app.mode !== 'place';
 
   // 引导跟着工具状态变：没点亮 → 一直提示"先点按钮"并让按钮呼吸；点亮 → 换成"怎么操作"
-  const guide = GUIDES[action];
-  els.toolStep.textContent = active ? '② 现在到舞台里操作木块' : '① 先点下面的按钮';
-  els.guideChip.textContent = active ? guide.active : guide.idle;
-  els.guideChip.classList.toggle('is-idle', !active);
-  els.actionBtn.classList.toggle('is-idle', !active);
-  if (active) hideGuideReminder();
+  const guide = GUIDES[gk];
+  if (locked) {
+    els.toolStep.textContent = '② 已添上一块 · 点「重置木块」可重来';
+    els.guideChip.textContent = '已添一块 · 需要「重置木块」才能再添';
+  } else {
+    els.toolStep.textContent = app.mode !== 'none'
+      ? '② 现在到舞台里操作木块'
+      : (task0 ? '① 先点一个工具按钮' : '① 先点下面的按钮');
+    els.guideChip.textContent = active ? guide.active : guide.idle;
+  }
+  els.guideChip.classList.toggle('is-idle', !locked && app.mode === 'none');
+  for (const btn of visibleToolButtons()) {
+    btn.classList.toggle('is-idle', !locked && app.mode === 'none');
+  }
+
+  // 任务3 只能添一块：加完后"添上"按钮变灰锁定；仍可点，点了提示需要重置
+  if (placeBtn) {
+    placeBtn.classList.toggle('is-locked', locked);
+    placeBtn.dataset.locked = String(locked);
+  }
+
+  if (app.mode !== 'none') hideGuideReminder();
 }
 
-/** 顶栏任务标签 + 左侧按钮文案 + 说明，全部跟着当前任务变 */
+/** 顶栏任务标签 + 工具按钮 + 说明，全部跟着当前任务/模式变 */
 function renderTaskUi() {
-  const meta = taskMeta(app.task);
+  const task = app.task;
+  // 任务标签：练习模式只显示任务0；正式模式只显示任务1/2/3
   for (const btn of els.taskTabs.querySelectorAll('.task-tab')) {
-    btn.setAttribute('aria-pressed', String(Number(btn.dataset.task) === app.task));
+    const t = Number(btn.dataset.task);
+    const show = app.viewMode === 'training' ? t === 0 : (t >= 1 && t <= 3);
+    btn.hidden = !show;
+    btn.setAttribute('aria-pressed', String(t === task));
   }
-  els.actionBtn.textContent = meta.actionLabel;
-  els.toolTip.textContent = TOOL_TIPS[meta.action];
-  els.kbHint.textContent = KB_TIPS[meta.action];
+  // 工具按钮：任务0 全显示；任务1/2/3 只显示对应那一个
+  const action = taskMeta(task).action;
+  for (const btn of els.toolButtons) {
+    btn.hidden = task === 0 ? false : btn.dataset.mode !== action;
+  }
+  const gk = guideKey();
+  els.toolTip.textContent = TOOL_TIPS[gk];
+  els.kbHint.textContent = KB_TIPS[gk];
   syncModeButtons();
 }
 
-/** 切换任务：把这一组重置成该任务的初始摆放并保存 */
+/** 该任务在当前模式下是否允许 */
+function taskAllowed(task) {
+  return app.viewMode === 'training' ? task === 0 : (task >= 1 && task <= 3);
+}
+
+/** 切换任务（仅正式模式 1/2/3；任务0 是本地练习，没有切换） */
 function switchTask(value) {
   const task = normalizeTask(value);
-  if (task === app.task) return;
+  if (!taskAllowed(task) || task === app.task) return;
 
   // 把当前任务的进度存回内存，切到目标任务（该任务原来的进度原样保留）
-  app.tasks[app.task] = app.cubes;
+  if (app.task >= 1) app.tasks[app.task] = app.cubes;
   app.task = task;
   setMode('none');
   app.stage.setSelected(null);
+  app.stage.setHighlight(null);
   app.cubes = pipeline(app.tasks[task] ?? taskInitial(task));
   app.tasks[task] = app.cubes;
   app.lastEditAt = Date.now();
@@ -393,6 +520,13 @@ function commit(next) {
   if (sameCubes(clean, app.cubes)) return;
 
   app.cubes = clean;
+  if (app.task === 0) {
+    // 任务0 是本地练习：只存本机，不写服务器
+    saveTask0(clean);
+    renderLocal();
+    return;
+  }
+
   app.tasks[app.task] = clean;   // 只更新当前任务这一槽
   app.lastEditAt = Date.now();
   app.dirty = true;
@@ -408,6 +542,7 @@ function renderLocal() {
 }
 
 function scheduleSave() {
+  if (app.task === 0 || !app.group) return;   // 本地练习不保存
   setStatus('saving', '正在保存…');
   clearTimeout(app.saveTimer);
   app.saveTimer = setTimeout(flushSave, SAVE_DEBOUNCE);
@@ -417,7 +552,7 @@ async function flushSave({ beacon = false } = {}) {
   clearTimeout(app.saveTimer);
   app.saveTimer = null;
 
-  if (!app.group) return;
+  if (!app.group || app.task === 0) return;   // 本地练习不保存
   const group = app.group;
   const cubes = app.cubes.map((c) => [...c]);
 
@@ -464,6 +599,7 @@ document.addEventListener('visibilitychange', () => {
 function applyState(state) {
   for (const g of state.groups) app.serverGroups.set(g.group, g);
   if (!app.group) return;
+  if (app.task === 0) return;   // 本地练习模式不跟随服务器
 
   const mine = app.serverGroups.get(app.group);
   if (!mine) return;
@@ -514,6 +650,13 @@ function connectStream() {
 
 async function boot() {
   setStatus('loading', '连接中…');
+  app.viewMode = readViewMode();
+
+  // 练习模式：只显示任务0，本地练习，不需要/不影响任何组的正式数据（也不连服务器）
+  if (app.viewMode === 'training') {
+    startPractice();
+    return;
+  }
 
   const params = new URLSearchParams(location.search);
   const wantsReset = params.has('reset');
@@ -538,6 +681,22 @@ async function boot() {
   }
 
   connectStream();
+}
+
+/** 练习模式（任务0）：本地操作、四个按钮都能用，不读/写服务器 */
+function startPractice() {
+  app.viewMode = 'training';
+  app.group = null;
+  app.bound = false;
+  document.documentElement.classList.add('has-group');
+  els.gate.hidden = true;
+  els.groupLabel.textContent = '练习模式';
+  app.task = 0;
+  app.cubes = readTask0();
+  if (!app.stage) initWorkspace();
+  renderTaskUi();
+  renderLocal();
+  setStatus('saved', '练习模式 · 只在本机保存');
 }
 
 boot();

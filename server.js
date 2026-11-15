@@ -130,6 +130,7 @@ async function serveStatic(req, res, pathname) {
   let rel = decodeURIComponent(pathname);
   if (rel === '/' || rel === '') rel = '/index.html';
   if (rel === '/teacher' || rel === '/teacher/') rel = '/teacher.html';
+  if (rel === '/settings' || rel === '/settings/') rel = '/settings.html';
 
   const filePath = path.join(PUBLIC_DIR, path.normalize(rel).replace(/^(\.\.[/\\])+/, ''));
   if (!filePath.startsWith(PUBLIC_DIR)) {

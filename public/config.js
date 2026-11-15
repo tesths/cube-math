@@ -8,10 +8,10 @@
  *       window.CUBE_VIEWS_CONFIG = { apiBase: 'https://cube-views.up.railway.app' };
  *
  * pollMs：只有"拿不到 SSE 长连接"时才轮询（Vercel 就是这种情况）。
- *   默认 2000 毫秒。免费版 Upstash 的命令数有限，课多的话可以改成 3000~5000，
- *   代价是老师看到更新会晚 1~3 秒。
+ *   默认 1000 毫秒（老师要求"1 秒同步一次"，界面也不再显示"慢速同步"）。
+ *   如果 Upstash 命令数紧张，可以调大到 2000~5000，代价是更新晚 1~4 秒。
  */
 window.CUBE_VIEWS_CONFIG = {
   apiBase: '',
-  pollMs: 2000,
+  pollMs: 1000,
 };

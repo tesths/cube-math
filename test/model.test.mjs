@@ -13,6 +13,10 @@ import {
   computeViews,
   collapseColumns,
   columnHeights,
+  taskInitial,
+  taskTarget,
+  normalizeTask,
+  taskMeta,
 } from '../public/js/shared/model.js';
 
 let passed = 0;
@@ -164,6 +168,23 @@ check('列高统计与投影一致：俯视图涂色格数 = 有方块的列数'
   const heights = columnHeights(shape);
   const top = viewFromTop(shape);
   assert.equal(heights.size, top.filled);
+});
+
+
+check('任务0 初始图形 = 第一层 111 + 第二层左边一块', () => {
+  assert.deepEqual(taskInitial(0).slice().sort(), [[1, 0, 2], [2, 0, 2], [3, 0, 2], [1, 1, 2]].sort());
+  assert.deepEqual(taskTarget(0).slice().sort(), taskInitial(0).slice().sort());
+});
+
+check('任务0 任务号可识别（0 不是非法值）', () => {
+  assert.equal(normalizeTask(0), 0);
+  assert.equal(taskMeta(0).name, '任务0');
+  assert.equal(normalizeTask(9), 1);   // 非法值仍回落到任务一
+});
+
+check('任务三初始 4 块（含正中间上方那块）', () => {
+  assert.equal(taskInitial(3).length, 4);
+  assert.ok(taskInitial(3).some((c) => c[0] === 2 && c[1] === 1 && c[2] === 2));
 });
 
 console.log(`\n${passed} 项通过${process.exitCode ? '，有失败项' : ''}`);

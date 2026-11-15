@@ -13,9 +13,10 @@
   try {
     var reset = /[?&]reset\b/.test(location.search);
     var fromUrl = /[?&]group=([1-8])\b/.exec(location.search);
+    var training = localStorage.getItem('cube-views:mode') === 'training';
     var bound = Number(localStorage.getItem('cube-views:group'));
-    // 地址栏里的 ?group= 也算已认领（老师可以直接发链接给学生）
-    if (!reset && (fromUrl || (bound >= 1 && bound <= 8))) {
+    // 地址栏里的 ?group= 也算已认领；练习模式直接进工作区，避免闪一下选组页
+    if (!reset && (training || fromUrl || (bound >= 1 && bound <= 8))) {
       document.documentElement.classList.add('has-group');
     }
   } catch (e) {
@@ -61,6 +62,7 @@
   </div>
   <div class="gate-foot">
     <span>一个组用一台电脑 · 正方体三视图</span>
+    <a class="gate-teacher" href="/settings">设置</a>
     <a class="gate-teacher" href="/teacher">教师端入口 →</a>
   </div>
 </div>
@@ -83,6 +85,7 @@
       <span id="groupLabel">第 1 组</span>
     </div>
 
+    <a class="btn btn-quiet topbar-settings" href="/settings">设置</a>
 
     <div class="spacer"></div>
 
@@ -93,6 +96,7 @@
 
   <div class="task-bar">
     <nav class="task-tabs" id="taskTabs" aria-label="选择任务">
+      <button class="task-tab" type="button" data-task="0" hidden>任务0</button>
       <button class="task-tab" type="button" data-task="1" aria-pressed="false">任务一</button>
       <button class="task-tab" type="button" data-task="2" aria-pressed="false">任务二</button>
       <button class="task-tab" type="button" data-task="3" aria-pressed="false">任务三</button>
@@ -103,7 +107,11 @@
     <section class="panel palette" aria-label="工具">
       <div class="tool-list">
         <p class="tool-step" id="toolStep">① 先点下面的按钮</p>
-        <button class="btn btn-block action-btn" id="actionBtn" type="button" aria-pressed="false">移动木块</button>
+        <div class="tool-modes" id="toolModes">
+          <button class="btn btn-block action-btn tool-mode-btn" data-mode="move" type="button" aria-pressed="false">移动木块</button>
+          <button class="btn btn-block action-btn tool-mode-btn" data-mode="erase" type="button" aria-pressed="false">拿走木块</button>
+          <button class="btn btn-block action-btn tool-mode-btn" data-mode="place" type="button" aria-pressed="false">添上木块</button>
+        </div>
         <button class="btn btn-block" id="resetBtn" type="button">重置木块</button>
       </div>
       <p class="tool-tip" id="toolTip">先点「移动木块」按钮，才能点木块；点中一块再点目标格子就能挪过去，也可以直接拖动。「重置木块」回到这个任务最初的样子。</p>

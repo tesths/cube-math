@@ -13,15 +13,19 @@
 
 export const LIMITS = Object.freeze({ sizeX: 5, sizeY: 5, sizeZ: 5 });
 
-// ---------------------------------------------------------------- 课堂任务（三选一）
+// ---------------------------------------------------------------- 课堂任务
 
 /**
- * 三个任务，每个任务对应一种操作：
- *   任务一 = 移动木块（方块数量不变）
- *   任务二 = 拿走木块（只会减少）
- *   任务三 = 添上木块（只会增加）
+ * 任务0 = 练习（熟悉平板）：移动 / 拿走 / 添上 三种操作都能用，四个按钮都有。
+ * 任务一 = 移动木块（方块数量不变）
+ * 任务二 = 拿走木块（只会减少）
+ * 任务三 = 添上木块（只会增加）
+ *
+ * 注意：任务0 只在学生端“练习模式”里本地使用，不写入服务器（见 app.js）；
+ * 服务器正式的三个任务仍是 1/2/3。
  */
 export const TASKS = Object.freeze({
+  0: { id: 0, name: '任务0', action: 'move', actionLabel: '移动木块', practice: true },
   1: { id: 1, name: '任务一', action: 'move', actionLabel: '移动木块' },
   2: { id: 2, name: '任务二', action: 'erase', actionLabel: '拿走木块' },
   3: { id: 3, name: '任务三', action: 'place', actionLabel: '添上木块' },
@@ -29,10 +33,10 @@ export const TASKS = Object.freeze({
 
 export const TASK_COUNT = 3;
 
-/** 把任意输入收敛成 1..3 的任务号（非法值按任务一） */
+/** 把任意输入收敛成 0..3 的任务号（非法值按任务一） */
 export function normalizeTask(value) {
   const n = Number(value);
-  return n === 1 || n === 2 || n === 3 ? n : 1;
+  return n === 0 || n === 1 || n === 2 || n === 3 ? n : 1;
 }
 
 export function taskMeta(value) {
@@ -73,9 +77,25 @@ const FIGURE_B = [
   [2, 1, 2],
 ];
 
-/** 某任务的"初始摆放"（任务三初始就是完整 4 块，含正中间上方那一块） */
+/*
+ * 任务0（练习）的图形，按老师给的矩阵：
+ * 第一层          第二层
+ *   0 0 0           0 0 0
+ *   1 1 1           1 0 0
+ *   0 0 0           0 0 0
+ * 行序是"最前(z=3) → 最后(z=1)"，所以：
+ *   第一层中间一行三块 → (1,0,2) (2,0,2) (3,0,2)
+ *   第二层中间一行左边一块 → (1,1,2)
+ */
+const FIGURE_0 = [
+  [1, 0, 2], [2, 0, 2], [3, 0, 2],
+  [1, 1, 2],
+];
+
+/** 某任务的"初始摆放"（任务三初始就是完整 4 块；任务0 为练习图形） */
 export function taskInitial(value) {
   const id = normalizeTask(value);
+  if (id === 0) return FIGURE_0.map((c) => [...c]);
   if (id === 3) return FIGURE_B.map((c) => [...c]);
   return FIGURE_A.map((c) => [...c]);
 }
@@ -83,6 +103,7 @@ export function taskInitial(value) {
 /** 某任务的"完成态"（暂时只用于以后做完成判定，界面先不比对） */
 export function taskTarget(value) {
   const id = normalizeTask(value);
+  if (id === 0) return FIGURE_0.map((c) => [...c]);
   return (id === 3 ? FIGURE_B : FIGURE_A).map((c) => [...c]);
 }
 

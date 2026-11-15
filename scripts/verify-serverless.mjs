@@ -175,7 +175,7 @@ const cardStage = teacher.locator('.group-card[data-group="3"] .card-stage');
 const cardBefore = await cardStage.screenshot();
 
 // 学生移动一块（拖动）——先开启「移动木块」，否则闸门会让点击无效
-await student.click('#actionBtn');
+await student.click('.tool-mode-btn:visible');
 await student.waitForTimeout(250);
 const sceneBox = await student.locator('#scene').boundingBox();
 const cubes0 = groups[2].tasks[groups[2].task];
@@ -307,7 +307,7 @@ const cubes3 = hangGroups[5].tasks[hangGroups[5].task];
 const from3 = screenOf(box3, cubes3[0], cubes3);
 const to3 = screenOf(box3, [0, 0, 4], cubes3, { ground: true });
 // 先开启「移动木块」，否则闸门会拦住这次拖动
-await page3.click('#actionBtn');
+await page3.click('.tool-mode-btn:visible');
 await page3.waitForTimeout(250);
 await page3.mouse.move(from3.x, from3.y);
 await page3.mouse.down();

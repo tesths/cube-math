@@ -138,8 +138,8 @@ await shot(student, 'student-desktop');
 // —— 三个任务：顶栏标签、按钮文案、图形、三种操作
 console.log('任务切换与三种操作');
 const taskInfo = async () => ({
-  tabs: await student.locator('.task-tab').evaluateAll((bs) => bs.map((b) => `${b.textContent}${b.getAttribute('aria-pressed') === 'true' ? '*' : ''}`)),
-  btn: (await student.textContent('#actionBtn')).trim(),
+  tabs: await student.locator('.task-tab:visible').evaluateAll((bs) => bs.map((b) => `${b.textContent}${b.getAttribute('aria-pressed') === 'true' ? '*' : ''}`)),
+  btn: (await student.textContent('.tool-mode-btn:visible')).trim(),
   count: (await student.textContent('#cubeCount')).trim(),
 });
 
@@ -164,7 +164,7 @@ const taskStageBox = await student.locator('#scene').boundingBox();
 // 任务三：先点「添上木块」，再在空地上添一块（4 → 5）
 let t3cubes = await stateOf(3);
 let pAdd = screenOfCell(taskStageBox, [4, 0, 4], t3cubes, { ground: true });
-await student.click('#actionBtn');
+await student.click('.tool-mode-btn:visible');
 await student.waitForTimeout(200);
 await student.mouse.click(pAdd.x, pAdd.y);
 await student.waitForTimeout(900);
@@ -174,7 +174,6 @@ const norm = (a) => JSON.stringify(a.map((c) => c.join(',')).sort());
 if (afterAdd.length !== 5 || !afterAdd.some((c) => c[0] === 4 && c[1] === 0 && c[2] === 4)) {
   errors.push(`[任务] 任务三添一块后应变成 5 块并包含 [4,0,4]（实际 ${JSON.stringify(afterAdd)}）`);
 }
-await student.click('#actionBtn');   // 关掉连续放置，后面用其他工具
 await student.waitForTimeout(200);
 
 // 任务二：拿走一块（6 → 5）
@@ -182,7 +181,7 @@ await student.click('.task-tab[data-task="2"]');
 await student.waitForTimeout(900);
 const t2cubes = await stateOf(3);
 const pErase = screenOfCell(taskStageBox, [1, 1, 2], t2cubes);
-await student.click('#actionBtn');
+await student.click('.tool-mode-btn:visible');
 await student.waitForTimeout(200);
 await student.mouse.click(pErase.x, pErase.y);
 await student.waitForTimeout(900);
@@ -204,7 +203,7 @@ const selBox = await student.locator('#scene').boundingBox();
 let cubesNow = await stateOf(3);
 
 // 先点亮「移动木块」——没点亮工具之前点方块不会选中（闸门）
-await student.click('#actionBtn');
+await student.click('.tool-mode-btn:visible');
 await student.waitForTimeout(200);
 
 // 点中一块 → 变橙（挑最高的那块，保证不会被别的方块挡住）
@@ -233,7 +232,7 @@ if (afterMove.length !== 6) errors.push(`[任务] 任务一移动后数量变了
 if (JSON.stringify(afterMove) === JSON.stringify(cubesNow)) errors.push('[任务] 任务一移动没有生效');
 if (!ghostShot.length) errors.push('[移动] 没有截到画面');
 await shot(student, 'student-after-move');
-await student.click('#actionBtn');   // 关掉移动模式，后面的拖动用普通拖拽
+await student.click('.tool-mode-btn:visible');   // 关掉移动模式，后面的拖动用普通拖拽
 await student.waitForTimeout(200);
 
 // 视角球：按住拖动必须改变角度（平板没有右键，全靠它）
@@ -305,7 +304,7 @@ await student.waitForTimeout(1200);
 const cardStage = teacher.locator('.group-card[data-group="3"] .card-stage');
 const cardBefore = await cardStage.screenshot();
 cubesNow = await stateOf(3);
-await student.click('#actionBtn');   // 开启「移动木块」才能拖动
+await student.click('.tool-mode-btn:visible');   // 开启「移动木块」才能拖动
 await student.waitForTimeout(200);
 const syncBox = await student.locator('#scene').boundingBox();
 const syncTop = cubesNow.reduce((best, c) => (c[1] > best[1] ? c : best), cubesNow[0]);
@@ -394,7 +393,7 @@ for (const size of sizes) {
     gridScroll: document.querySelector('.views-grid').scrollHeight,
   }));
   const padBox = await page.locator('#orbitPad').boundingBox();
-  const btnBox = await page.locator('#actionBtn').boundingBox();
+  const btnBox = await page.locator('.tool-mode-btn:visible').boundingBox();
   console.log(`  ${size.name} ${size.width}×${size.height}：宽 ${overflow.scrollWidth}/${overflow.innerWidth}，高 ${layout.scrollH}/${layout.innerH}，按钮 ${Math.round(btnBox.height)}px，视角球 ${Math.round(padBox.width)}px，三视图 ${layout.gridClient}/${layout.gridScroll}`);
   // "≥44px" 是对触屏的要求；鼠标布局下 38px 是桌面习惯尺寸
   if (size.touch && btnBox.height < 44) {
@@ -549,7 +548,7 @@ await post(5, [[2, 0, 2], [2, 1, 2], [2, 2, 2]]);
 const stack = await newPage2();
 await stack.goto(`${BASE}/?group=5`, { waitUntil: 'load' });
 await stack.waitForTimeout(1200);
-await stack.click('#actionBtn');   // 开启「移动木块」才能拖动
+await stack.click('.tool-mode-btn:visible');   // 开启「移动木块」才能拖动
 await stack.waitForTimeout(200);
 const stackRect = await stack.locator('#scene').boundingBox();
 const tower = await stateOf(5);
@@ -573,7 +572,7 @@ if (JSON.stringify(afterReload) !== JSON.stringify(movedCubes)) {
 
 console.log('\n回归：键盘把选中的方块挪过去');
 const kbCubes = await stateOf(5);
-await stack.click('#actionBtn');   // 键盘移动也要求先点亮「移动木块」
+await stack.click('.tool-mode-btn:visible');   // 键盘移动也要求先点亮「移动木块」
 await stack.waitForTimeout(200);
 const kbPick = screenOfCell(stackRect, kbCubes[0], kbCubes);
 await stack.mouse.click(kbPick.x, kbPick.y);
@@ -617,7 +616,7 @@ await jumpA.goto(`${BASE}/?group=4`, { waitUntil: 'load' });
 await jumpA.waitForTimeout(1000);
 await jumpA.click('.task-tab[data-task="3"]');
 await jumpA.waitForTimeout(900);
-await jumpA.click('#actionBtn');           // 任务三进入「连续放置」
+await jumpA.click('.tool-mode-btn:visible');           // 任务三进入「连续放置」
 await jumpA.waitForTimeout(300);
 const jumpBefore = (await jumpA.locator('.task-tab[aria-pressed="true"]').textContent()).trim();
 const jumpB = await newPage2();
@@ -633,6 +632,73 @@ if (jumpBefore !== '任务三' || jumpAfter !== '任务三') {
 }
 await jumpB.close();
 await jumpA.close();
+
+// 回归：任务2 只能拿一个、任务3 只能添一个（按钮锁定 + 提示重置）
+console.log('\n回归：任务2 只能拿一个 / 任务3 只能添一个');
+const T_A = [[1, 0, 3], [1, 0, 2], [2, 0, 2], [3, 0, 2], [2, 0, 1], [1, 1, 2]];
+const T_B = [[1, 0, 3], [1, 0, 2], [2, 0, 2], [2, 1, 2]];
+await post(4, T_A, 1); await post(4, T_A, 2); await post(4, T_B, 3); await post(4, T_A, 1);
+const rule = await newPage2();
+await rule.goto(`${BASE}/?reset&group=4`, { waitUntil: 'load' });
+await rule.waitForTimeout(1200);
+// 任务2
+await rule.click('.task-tab[data-task="2"]'); await rule.waitForTimeout(600);
+let rbox = await rule.locator('#scene').boundingBox();
+let rc = await stateOf(4);
+await rule.click('.tool-mode-btn:visible'); await rule.waitForTimeout(200);
+await rule.mouse.click(...Object.values(screenOfCell(rbox, [1, 1, 2], rc)));
+await rule.waitForTimeout(700);
+rc = await stateOf(4);
+if (rc.length !== 5) errors.push(`[规则] 任务2 拿走一块应为 5 块（${rc.length}）`);
+await rule.mouse.click(...Object.values(screenOfCell(rbox, [2, 0, 2], rc)));
+await rule.waitForTimeout(500);
+rc = await stateOf(4);
+if (rc.length !== 5) errors.push(`[规则] 任务2 再拿应被阻止（${rc.length} 块）`);
+if (!/只能拿走一个/.test((await rule.textContent('#guideToast')).trim())) errors.push('[规则] 任务2 再拿没有提示');
+// 任务3
+await rule.click('.task-tab[data-task="3"]'); await rule.waitForTimeout(600);
+rbox = await rule.locator('#scene').boundingBox();
+let r3 = await stateOf(4);
+await rule.click('.tool-mode-btn:visible'); await rule.waitForTimeout(200);
+await rule.mouse.click(...Object.values(screenOfCell(rbox, [4, 0, 4], r3, { ground: true })));
+await rule.waitForTimeout(700);
+r3 = await stateOf(4);
+if (r3.length !== 5) errors.push(`[规则] 任务3 添一块应为 5 块（${r3.length}）`);
+if ((await rule.locator('.tool-mode-btn[data-mode="place"]').getAttribute('data-locked')) !== 'true') {
+  errors.push('[规则] 任务3 添完后「添上木块」按钮未锁定');
+}
+await rule.click('.tool-mode-btn[data-mode="place"]'); await rule.waitForTimeout(400);
+if (!/只能添加一个/.test((await rule.textContent('#guideToast')).trim())) errors.push('[规则] 任务3 再添没有提示');
+if ((await stateOf(4)).length !== 5) errors.push('[规则] 任务3 再添应被阻止');
+await rule.close();
+
+// 回归：练习模式（任务0）只有任务0，三个工具 + 重置可用
+console.log('\n回归：练习模式（任务0）');
+const trainCtx = await browser2.newContext({ viewport: { width: 1400, height: 880 }, locale: 'zh-CN' });
+await trainCtx.addInitScript(() => {
+  try {
+    localStorage.setItem('cube-views:mode', 'training');
+    localStorage.removeItem('cube-views:group');
+    localStorage.removeItem('cube-views:task0');
+  } catch { /* ignore */ }
+});
+const tpage = hook(await trainCtx.newPage());
+await tpage.goto(`${BASE}/`, { waitUntil: 'load' });
+await tpage.waitForTimeout(1100);
+const tTabs = await tpage.locator('.task-tab:visible').allTextContents();
+if (tTabs.length !== 1 || tTabs[0].trim() !== '任务0') errors.push(`[练习] 应只显示任务0（${tTabs.join('/')}）`);
+if ((await tpage.locator('.tool-mode-btn:visible').count()) !== 3) errors.push('[练习] 应有移动/拿走/添上三个工具');
+if ((await tpage.textContent('#cubeCount')).trim() !== '4 块') errors.push('[练习] 初始应为 4 块');
+const tbox = await tpage.locator('#scene').boundingBox();
+const tInit = [[1, 0, 2], [2, 0, 2], [3, 0, 2], [1, 1, 2]];
+await tpage.click('.tool-mode-btn[data-mode="erase"]'); await tpage.waitForTimeout(200);
+await tpage.mouse.click(...Object.values(screenOfCell(tbox, [2, 0, 2], tInit)));
+await tpage.waitForTimeout(400);
+if ((await tpage.textContent('#cubeCount')).trim() !== '3 块') errors.push('[练习] 拿走一块应为 3 块');
+await tpage.click('#resetBtn'); await tpage.waitForTimeout(300);
+if ((await tpage.textContent('#cubeCount')).trim() !== '4 块') errors.push('[练习] 重置应回到 4 块');
+await tpage.close();
+await trainCtx.close();
 
 // ---------------------------------------------------------------- 收尾
 const T1_CLEAN = [[1, 0, 3], [1, 0, 2], [2, 0, 2], [3, 0, 2], [2, 0, 1], [1, 1, 2]];

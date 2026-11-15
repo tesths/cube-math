@@ -161,6 +161,7 @@ function buildBoard() {
 }
 
 function updateSummary() {
+  if (!els.summary) return;
   let started = 0;
   let total = 0;
   for (const entry of cards.values()) {
@@ -420,10 +421,7 @@ async function boot() {
     onStatus: (status) => {
       if (status === 'live') setStatus('saved', '实时同步中');
       else if (status === 'connecting') setStatus('loading', '连接中…');
-      else if (status === 'polling') {
-        const secs = Math.round((Number(globalThis.CUBE_VIEWS_CONFIG?.pollMs) || 2000) / 1000);
-        setStatus('saving', `慢速同步中（每 ${secs} 秒刷新）`);
-      }
+      else if (status === 'polling') setStatus('saved', '已同步');
       else setStatus('offline', '连接断开，正在重连…');
     },
   });

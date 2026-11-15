@@ -74,6 +74,7 @@ export class CubeStage {
     this.userAdjusted = false;   // 用户自己转过视角后，不再自动改他的取景
     this.kbActive = false;       // 键盘光标是否已激活
     this.hoverKey = null;        // 橡皮模式下悬停的方块
+    this.highlightKey = null;    // 需要长期标粉的方块（任务3 新添的那一块）
     this.focusCell = null;       // 键盘光标所在的格子 {x, z}
 
     this._initThree();
@@ -462,6 +463,7 @@ export class CubeStage {
     }
 
     if (this.hoverKey && !this.occupied.has(this.hoverKey)) this.hoverKey = null;
+    if (this.highlightKey && !this.occupied.has(this.highlightKey)) this.highlightKey = null;
     if (this.selected && !this.occupied.has(keyOf(...this.selected))) {
       this.selected = null;
       this.canvas.dataset.selected = '';
@@ -481,10 +483,20 @@ export class CubeStage {
   _paintCubes() {
     const selKey = this.selected ? keyOf(...this.selected) : null;
     for (const [k, mesh] of this.meshes) {
-      if (k === selKey) mesh.material = this.matSelected;
+      // 选中的、以及需要长期标粉的（任务3 新添那块）都用粉色
+      if (k === selKey || k === this.highlightKey) mesh.material = this.matSelected;
       else if (k === this.hoverKey) mesh.material = this.matHover;
       else mesh.material = this.matCube;
     }
+  }
+
+  /** 长期标粉某一块（任务3 新添的积木）；null = 取消 */
+  setHighlight(cell) {
+    const next = cell ? keyOf(cell[0], cell[1], cell[2]) : null;
+    if (next === this.highlightKey) return;
+    this.highlightKey = next;
+    this._paintCubes();
+    this.needsRender = true;
   }
 
   /** 选中某一块（null = 取消选中）。只改颜色，不改数据。 */

@@ -438,6 +438,16 @@ html.has-group .gate { display: none; }
   padding: 12px;
 }
 
+/* 工具模式按钮组：任务0 三个都在，任务1/2/3 只显示对应那一个 */
+.tool-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tool-mode-btn[hidden] { display: none !important; }
+
+.topbar-settings { height: 34px; padding: 0 10px; font-size: 13px; }
+
 .tool-tip {
   margin: 0;
   padding: 0 12px 12px;
@@ -475,6 +485,17 @@ html.has-group .gate { display: none; }
 
 /* 没点按钮就点了方块：按钮再用力闪两下，把视线拉回来 */
 .action-btn.nudge { animation: action-nudge .42s ease-out 2; }
+
+/* 任务3 已添过一块：添上按钮锁定（点了会给提示，需要重置） */
+.action-btn.is-locked {
+  opacity: .45;
+  cursor: not-allowed;
+  background: var(--panel-alt);
+  border-color: var(--line);
+  color: var(--ink-3);
+  animation: none;
+  box-shadow: none;
+}
 
 @keyframes action-nudge {
   0%, 100% { transform: scale(1); }
@@ -1025,4 +1046,70 @@ body.is-focusing { overflow: hidden; }
   .orbit-pad svg { width: 26px; height: 26px; }
   .orbit-pad span { font-size: 10px; }
   .view-reset { height: 40px; padding: 0 11px; font-size: 12px; }
+}
+
+/* ============================================================================
+   设置页：选择这台设备显示「任务0」还是「任务1·2·3」
+   ========================================================================= */
+
+.settings-page {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.settings {
+  width: min(760px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2);
+  padding: 28px 28px 24px;
+}
+
+.settings h1 { font-size: clamp(24px, 3vw, 34px); }
+.settings-lede {
+  margin: 10px 0 20px;
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.settings-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+.settings-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 22px 20px;
+  min-height: 120px;
+  background: var(--panel-alt);
+  border: 2px solid var(--line);
+  border-radius: var(--r-lg);
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+  transition: border-color .15s ease-out, background-color .15s ease-out, transform .1s ease-out;
+}
+.settings-choice:hover { border-color: var(--blue-line); }
+.settings-choice:active { transform: scale(.99); }
+.settings-choice strong { font-size: clamp(20px, 2.4vw, 26px); letter-spacing: -.01em; }
+.settings-choice span { font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+.settings-choice[aria-pressed="true"] {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  box-shadow: 0 0 0 3px rgba(140, 90, 43, .12) inset;
+}
+.settings-choice[aria-pressed="true"] strong { color: var(--blue); }
+
+.settings-note { min-height: 22px; margin: 16px 0; color: var(--ok); font-weight: 600; font-size: 14px; }
+.settings-back { display: inline-flex; }
+.settings-foot { margin-top: 6px; }
+
+@media (max-width: 640px) {
+  .settings-choices { grid-template-columns: 1fr; }
 }

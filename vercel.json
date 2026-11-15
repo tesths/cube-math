@@ -10,7 +10,9 @@
   },
   "rewrites": [
     { "source": "/teacher", "destination": "/teacher.html" },
-    { "source": "/teacher/", "destination": "/teacher.html" }
+    { "source": "/teacher/", "destination": "/teacher.html" },
+    { "source": "/settings", "destination": "/settings.html" },
+    { "source": "/settings/", "destination": "/settings.html" }
   ],
   "headers": [
     {

@@ -91,10 +91,10 @@ try {
   check('进组后地址栏保留 ?group=3', page.url().includes('group=3'), page.url());
   check('工作区里没有教师端链接', (await page.locator('.app a[href="/teacher"]').count()) === 0);
   check('默认任务是任务一', (await page.locator('.task-tab[aria-pressed="true"]').textContent()).trim() === '任务一');
-  check('任务一按钮是「移动木块」', (await page.textContent('#actionBtn')).trim() === '移动木块');
+  check('任务一按钮是「移动木块」', (await page.textContent('.tool-mode-btn:visible')).trim() === '移动木块');
   check('任务一初始 6 块', (await page.textContent('#cubeCount')).trim() === '6 块');
-  check('任务栏三个任务', (await page.locator('.task-tab').count()) === 3);
-  const tabTexts = await page.locator('.task-tab').allTextContents();
+  check('任务栏三个任务', (await page.locator('.task-tab:visible').count()) === 3);
+  const tabTexts = await page.locator('.task-tab:visible').allTextContents();
   check('三个任务文案正确', JSON.stringify(tabTexts.map((t) => t.trim())) === JSON.stringify(['任务一', '任务二', '任务三']), tabTexts.join('/'));
 
   // ---------- 3. 三视图
@@ -112,9 +112,9 @@ try {
   // ---------- 4. 任务二：拿走
   await page.click('.task-tab[data-task="2"]');
   await page.waitForTimeout(1000);
-  check('任务二按钮是「拿走木块」', (await page.textContent('#actionBtn')).trim() === '拿走木块');
+  check('任务二按钮是「拿走木块」', (await page.textContent('.tool-mode-btn:visible')).trim() === '拿走木块');
   check('任务二初始 6 块', (await page.textContent('#cubeCount')).trim() === '6 块');
-  await page.click('#actionBtn');
+  await page.click('.tool-mode-btn:visible');
   await page.waitForTimeout(200);
   // 点最上面那块 (1,1,2)
   const box = await page.locator('#scene').boundingBox();
@@ -138,9 +138,9 @@ try {
   // ---------- 5. 任务三：添上
   await page.click('.task-tab[data-task="3"]');
   await page.waitForTimeout(1000);
-  check('任务三按钮是「添上木块」', (await page.textContent('#actionBtn')).trim() === '添上木块');
+  check('任务三按钮是「添上木块」', (await page.textContent('.tool-mode-btn:visible')).trim() === '添上木块');
   check('任务三初始 4 块', (await page.textContent('#cubeCount')).trim() === '4 块');
-  await page.click('#actionBtn');
+  await page.click('.tool-mode-btn:visible');
   await page.waitForTimeout(200);
   st = await scene(3);
   p = cam(st.cubes)([4, 0, 4], true);
@@ -158,7 +158,7 @@ try {
   await page.waitForTimeout(1000);
   st = await scene(3);
   check('切换任务一会载入 6 块初始图形', st.cubes.length === 6 && st.task === 1);
-  await page.click('#actionBtn');
+  await page.click('.tool-mode-btn:visible');
   await page.waitForTimeout(250);
   const sceneBox = await page.locator('#scene').boundingBox();
   const st1 = await scene(3);
@@ -200,7 +200,7 @@ try {
   check('重置回到任务一初始 6 块', st.cubes.length === 6 && norm(st.cubes) === norm(T1), `${st.cubes.length} 块`);
 
   // ---------- 7. 键盘
-  await page.click('#actionBtn');                       // 打开移动
+  await page.click('.tool-mode-btn:visible');                       // 打开移动
   await page.waitForTimeout(200);
   let kst = await scene(3);
   const kCell = kst.cubes.reduce((b, c) => (c[1] > b[1] ? c : b), kst.cubes[0]);
@@ -214,7 +214,7 @@ try {
   await page.waitForTimeout(900);
   const kst2 = await scene(3);
   check('键盘移动：方向键+回车能挪动', kst2.cubes.length === 6 && norm(kst2.cubes) !== norm(kst.cubes), JSON.stringify(kst2.cubes));
-  await page.click('#actionBtn');
+  await page.click('.tool-mode-btn:visible');
 
   // ---------- 8. 教师端
   const teacher = await ctx.newPage();
@@ -233,7 +233,7 @@ try {
   const cardStage = teacher.locator('.group-card[data-group="3"] .card-stage');
   const cardA = await cardStage.screenshot();
 
-  await page.click('#actionBtn');
+  await page.click('.tool-mode-btn:visible');
   await page.waitForTimeout(250);
   const s2 = await scene(3);
   const syncBox = await page.locator('#scene').boundingBox();
