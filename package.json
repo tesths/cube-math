@@ -1,0 +1,23 @@
+{
+  "name": "cube-math",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "正方体摆放 + 三视图 教学网站（学生端 / 教师端）",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "vendor": "node scripts/vendor-three.mjs",
+    "test": "node test/model.test.mjs && node test/camera-fit.test.mjs && node test/deploy.test.mjs",
+    "verify:serverless": "node scripts/verify-serverless.mjs",
+    "verify:e2e": "node scripts/screenshot.mjs",
+    "verify:prod": "node scripts/audit.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.63.0",
+    "three": "^0.186.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

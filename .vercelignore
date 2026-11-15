@@ -1,0 +1,14 @@
+# Vercel 只用 public/ 静态文件 + api/ 无服务器函数。
+# server.js 是本地/Railway 用的长驻服务器，上传会被 Vercel 当成根入口而报错。
+server.js
+node_modules
+data
+shots
+docs
+test
+scripts
+.git
+*.md
+.env
+.env.*
+.DS_Store

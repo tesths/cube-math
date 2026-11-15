@@ -1,0 +1,940 @@
+/* ============================================================================
+   正方体三视图 · 设计系统
+   世界：方格纸 / 制图（三视图本身就是工程制图的产物，学生的方块也落在格子上）
+   策略：Restrained —— 中性纸底 + 一个主色，朱红只用于"当前/刚刚变化"的注意力
+   ========================================================================= */
+
+:root {
+  --topbar-h: 58px;
+  --taskbar-h: 60px;   /* 顶栏高度：大屏媒体查询里会改成 64px，工作区以此计算可用高度 */
+
+  /* 纸与墨：肉色偏黄（暖沙 / 米黄），不用冷灰 */
+  --paper: #f7ecdd;
+  --panel: #fffaf3;
+  --panel-alt: #f2e4d0;
+  --ink: #3a2c1e;
+  --ink-2: #6d5842;
+  --ink-3: #7d664e;
+  --line: #e6d3b8;
+  --line-strong: #d3b995;
+
+  /* 方格纸 */
+  --grid: #eadbc4;
+  --grid-strong: #dcc8a8;
+
+  /* 主色：暖褐（原制图蓝，随整体色调改为肉色系） */
+  --blue: #8c5a2b;
+  --blue-mid: #b07a3c;
+  --blue-soft: #f6e6d0;
+  --blue-line: #d9bd97;
+
+  /* 注意力 / 危险：砖红 */
+  --accent: #b3402a;
+  --accent-soft: #f8e3dc;
+
+  --ok: #5f7a34;
+  --ok-soft: #eef1e2;
+  --danger: #b3402a;
+
+  /* 选中的积木：橙 */
+  --select: #f97316;
+
+  --r-sm: 3px;
+  --r-md: 5px;
+  --r-lg: 8px;
+
+  --shadow-1: 0 1px 2px rgba(74, 50, 26, .08), 0 2px 6px rgba(74, 50, 26, .06);
+  --shadow-2: 0 2px 4px rgba(74, 50, 26, .10), 0 10px 24px rgba(74, 50, 26, .10);
+
+  --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", "Source Han Sans SC", sans-serif;
+  --data: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  --tap: 44px;
+}
+
+* { box-sizing: border-box; }
+
+/* 组件里大量使用 display，[hidden] 必须能压过它们 */
+[hidden] { display: none !important; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--ui);
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -.01em; }
+
+button { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--blue-mid);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* ---------------------------------------------------------------- 顶栏 */
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  height: var(--topbar-h);
+  padding: 0 18px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  position: relative;
+  z-index: 5;
+}
+
+.status, .btn, .group-chip, .brand { white-space: nowrap; }
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 680;
+  font-size: 16px;
+  letter-spacing: -.015em;
+  white-space: nowrap;
+}
+
+.brand svg { display: block; }
+
+.brand small {
+  font-weight: 500;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  padding-left: 9px;
+  margin-left: 3px;
+  border-left: 1px solid var(--line);
+}
+
+.topbar .spacer { flex: 1; }
+
+/* ---------------------------------------------------------------- 控件 */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 13px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  font-size: 14px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background-color .16s ease-out, border-color .16s ease-out,
+              color .16s ease-out, transform .12s ease-out;
+}
+
+.btn:hover:not(:disabled) { background: var(--panel-alt); border-color: var(--ink-3); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) { background: #6f4520; border-color: #6f4520; }
+
+.btn-quiet { border-color: transparent; background: transparent; }
+.btn-quiet:hover:not(:disabled) { background: var(--panel-alt); border-color: transparent; }
+
+/* 开关型按钮的激活态：橡皮擦开着要一眼看得出来 */
+.btn[aria-pressed="true"] {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+.btn[aria-pressed="true"]:hover { background: #6f4520; border-color: #6f4520; }
+
+.btn-danger { color: var(--danger); }
+.btn-danger:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--accent); }
+
+.btn-block { width: 100%; }
+
+.group-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px;
+  background: var(--blue-soft);
+  border: 1px solid var(--blue-line);
+  border-radius: var(--r-md);
+  font-weight: 620;
+  color: var(--blue);
+}
+
+/* 任务栏：单独一行放在顶栏下面，三个任务各自独立成块（分开、好点） */
+.task-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: var(--taskbar-h);
+  padding: 0 14px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+
+.task-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.task-tab {
+  height: 38px;
+  min-width: 104px;
+  padding: 0 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 620;
+  cursor: pointer;
+  touch-action: manipulation;
+  white-space: nowrap;
+  box-shadow: var(--shadow-1);
+  transition: background-color .16s ease-out, color .16s ease-out, border-color .16s ease-out, transform .1s ease-out;
+}
+
+.task-tab:hover { background: var(--blue-soft); border-color: var(--blue-line); color: var(--blue); }
+.task-tab:active { transform: scale(.98); }
+
+.task-tab[aria-pressed="true"] {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(74, 50, 26, .22);
+}
+
+@media (pointer: coarse) {
+  .task-tab { height: 44px; min-width: 110px; font-size: 15px; }
+}
+
+.task-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 3px;
+  background: var(--blue-soft);
+  border: 1px solid var(--blue-line);
+  color: var(--blue);
+  font-size: 11.5px;
+  font-weight: 620;
+  white-space: nowrap;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.status .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--ink-3);
+  flex: none;
+}
+.status[data-state="saved"] .dot { background: var(--ok); }
+.status[data-state="saving"] .dot { background: var(--blue-mid); }
+.status[data-state="error"] .dot { background: var(--danger); }
+.status[data-state="offline"] .dot { background: var(--danger); }
+
+/* ---------------------------------------------------------------- 选组 */
+
+.gate {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  padding: 40px 24px 28px;
+  overflow: auto;
+  background: var(--paper);
+}
+
+.gate[hidden] { display: none; }
+
+/* 已经认领过组：首页收起，工作区展开（首屏由 <head> 里的内联脚本提前加类，避免闪一下） */
+.app { display: none; }
+html.has-group .app { display: block; }
+html.has-group .gate { display: none; }
+
+.gate-inner {
+  width: min(760px, 100%);
+  margin: 0 auto;
+  align-self: center;
+}
+
+.gate h1 {
+  font-size: clamp(26px, 3.6vw, 38px);
+  line-height: 1.15;
+  margin-bottom: 10px;
+}
+
+.gate p.lede {
+  color: var(--ink-2);
+  font-size: 16px;
+  margin: 0 0 28px;
+  max-width: 52ch;
+}
+
+.gate-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.gate-grid button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 104px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  transition: transform .16s cubic-bezier(.2,.7,.3,1), border-color .16s ease-out,
+              box-shadow .16s ease-out;
+}
+
+.gate-grid button:hover {
+  transform: translateY(-3px);
+  border-color: var(--blue-mid);
+  box-shadow: var(--shadow-2);
+}
+
+.gate-grid .n {
+  font-family: var(--data);
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.gate-grid .t { font-size: 13.5px; color: var(--ink-2); }
+
+.gate-grid .taken {
+  position: absolute;
+  top: 8px; right: 8px;
+  font-size: 11.5px;
+  color: var(--blue);
+  background: var(--blue-soft);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.gate-note {
+  margin: 20px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.gate-foot {
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding-top: 18px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* 教师端入口：放在首页角落，学生平时点不到；进了工作区就没有这个链接 */
+.gate-teacher {
+  margin-left: auto;
+  padding: 8px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  color: var(--ink-2);
+  font-weight: 560;
+  text-decoration: none;
+  transition: background-color .16s ease-out, border-color .16s ease-out, color .16s ease-out;
+}
+
+.gate-teacher:hover {
+  background: var(--blue-soft);
+  border-color: var(--blue-mid);
+  color: var(--blue);
+}
+
+@media (pointer: coarse) {
+  .gate-teacher { min-height: 48px; display: inline-flex; align-items: center; padding: 0 18px; }
+}
+
+/* ---------------------------------------------------------------- 布局 */
+
+.workspace {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) 392px;
+  gap: 14px;
+  padding: 14px;
+  height: calc(100vh - var(--topbar-h) - var(--taskbar-h));
+  min-height: 0;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  font-weight: 620;
+  color: var(--ink-2);
+  letter-spacing: .01em;
+}
+
+.panel-body { padding: 12px; overflow: auto; }
+
+/* 工具栏：只有三个按钮，少了就是少了 */
+
+.tool-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+.tool-tip {
+  margin: 0;
+  padding: 0 12px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+
+/* ---------------------------------------------------------------- 3D 舞台 */
+
+.stage { position: relative; overflow: hidden; }
+
+.stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.stage[data-placing="true"] canvas { cursor: copy; }
+
+.stage-hint {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  pointer-events: none;
+}
+
+.chip {
+  background: rgba(255, 255, 255, .93);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  box-shadow: var(--shadow-1);
+  backdrop-filter: blur(3px);
+}
+
+.chip.strong { color: var(--ink); font-weight: 560; }
+
+.stage-stat {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+
+/* 三视图：点一下按钮，三个方向同时显示 */
+
+.view-head { padding: 12px 12px 0; }
+
+.view-placeholder {
+  margin: 12px;
+  padding: 18px 16px;
+  background: var(--panel-alt);
+  border-radius: var(--r-md);
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.view-placeholder[hidden] { display: none; }
+.view-placeholder strong { display: block; color: var(--ink); font-size: 14px; margin-bottom: 4px; }
+.view-placeholder p { margin: 0; }
+
+.views-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.view-item {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 8px 10px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.view-item-title {
+  font-size: 13.5px;
+  font-weight: 620;
+  color: var(--ink);
+}
+
+.view-item-canvas {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.view-item-canvas canvas { display: block; }
+
+.view-item-empty {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.view-item-size {
+  margin: 0;
+  font-family: var(--data);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  text-align: right;
+}
+
+.view-foot {
+  margin: 0;
+  padding: 0 14px 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+
+/* ---------------------------------------------------------------- 教师端 */
+
+.teacher-board {
+  padding: 14px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 12px;
+  height: calc(100vh - var(--topbar-h));
+  min-height: 0;
+}
+
+.group-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  transition: background-color .22s ease-out;
+}
+
+.group-card[data-updated="true"] { background: var(--blue-soft); }
+.group-card[data-empty="true"] { border-style: dashed; }
+
+.group-card { position: relative; }
+
+.group-card header {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 10px 60px 10px 12px;   /* 右边留给"放大"按钮 */
+  border-bottom: 1px solid var(--line);
+}
+
+.group-card .name { font-weight: 650; font-size: 14.5px; white-space: nowrap; }
+.group-card .task-tag { flex: none; }
+.group-card .count {
+  font-family: var(--data); font-size: 12.5px; color: var(--blue);
+  white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+}
+.group-card .when {
+  margin-left: auto;
+  font-family: var(--data);
+  font-size: 11.5px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.group-card .card-open {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  margin-left: 0;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+
+/* 窄一点的屏幕上，把"多久以前"藏掉，别把标题挤爆 */
+@media (max-width: 1180px) {
+  .group-card .when { display: none; }
+}
+
+.group-card .card-stage { flex: 1; min-height: 0; position: relative; }
+.group-card canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+.group-card .card-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 16px;
+  color: var(--ink-3);
+  font-size: 13.5px;
+  pointer-events: none;
+}
+
+.group-card .card-empty span { max-width: 22ch; }
+
+/* ---------------------------------------------------------------- 小屏 */
+
+@media (max-width: 1180px) {
+  .workspace { grid-template-columns: 148px minmax(0, 1fr) 330px; }
+}
+
+@media (max-width: 980px) {
+  :root { --taskbar-h: 54px; }
+  .task-tab { min-width: 92px; padding: 0 14px; font-size: 14px; }
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(280px, 42vh) auto;
+    height: auto;
+    min-height: calc(100vh - var(--topbar-h) - var(--taskbar-h));
+  }
+  .tool-list { flex-direction: row; flex-wrap: wrap; gap: 8px; }
+  .tool-list .btn { flex: 1; min-width: 92px; }
+  .tool-tip { padding: 0 12px 12px; }
+  .views-grid { overflow: visible; }
+  .teacher-board { grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; grid-auto-rows: minmax(240px, 34vh); }
+  .gate-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .teacher-board { grid-template-columns: minmax(0, 1fr); }
+  .brand small { display: none; }
+  .topbar { height: auto; padding: 9px 12px; row-gap: 8px; gap: 10px; }
+  .brand { flex: 1 1 100%; font-size: 15px; }
+  .brand svg { width: 19px; height: 19px; }
+  .workspace { padding: 10px; gap: 10px; }
+  .view-item-canvas { min-height: 140px; }
+  .gate-grid { grid-template-columns: repeat(2, 1fr); }
+  .gate-grid button { min-height: 88px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
+
+/* ============================================================================
+   视角球（平板没有右键，靠它转视角）
+   ========================================================================= */
+
+.stage-tools {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 3;
+}
+
+/* 复位：只做"回到正面视角"这一件事 */
+.view-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, .94);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: var(--shadow-1);
+  transition: background-color .16s ease-out, border-color .16s ease-out, color .16s ease-out;
+}
+
+.view-reset svg { width: 14px; height: 14px; }
+.view-reset:hover { background: var(--blue-soft); border-color: var(--blue-mid); color: var(--blue); }
+.view-reset:active { transform: scale(.97); }
+
+/* 视角球：只负责转视角（点一下不再回正） */
+.orbit-pad {
+  width: 72px;
+  height: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .94);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-1);
+  color: var(--blue);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  transition: background-color .16s ease-out, border-color .16s ease-out, transform .12s ease-out;
+}
+
+.orbit-pad:hover { background: #fff; border-color: var(--blue-mid); }
+.orbit-pad:active,
+.orbit-pad[data-active="true"] {
+  cursor: grabbing;
+  transform: scale(.97);
+  background: var(--blue-soft);
+  border-color: var(--blue);
+}
+
+.orbit-pad svg { width: 30px; height: 30px; display: block; }
+.orbit-pad span { font-size: 10.5px; font-weight: 600; letter-spacing: .02em; color: var(--ink-2); }
+
+/* ============================================================================
+   教师端：点击卡片放大演示（大屏讲课）
+   ========================================================================= */
+
+.group-card { cursor: pointer; }
+.group-card:hover { border-color: var(--blue-mid); box-shadow: var(--shadow-1); }
+.group-card:focus-within { outline: 2px solid var(--blue-mid); outline-offset: 2px; }
+
+.card-open {
+  flex: none;
+  min-height: 34px;
+  padding: 0 12px;
+  margin-left: 10px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--blue-line);
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 620;
+  cursor: pointer;
+  transition: background-color .16s ease-out, border-color .16s ease-out, color .16s ease-out;
+}
+
+.card-open:hover { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+@media (pointer: coarse) {
+  .card-open { min-height: 46px; padding: 0 18px; font-size: 15px; }
+}
+
+body.is-focusing { overflow: hidden; }
+
+.focus-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--paper);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.focus-layer[hidden] { display: none !important; }
+
+.focus-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.focus-title { display: flex; align-items: baseline; gap: 12px; }
+.focus-title strong { font-size: clamp(20px, 2.2vw, 30px); }
+.focus-meta { font-family: var(--data); font-size: clamp(13px, 1.1vw, 17px); color: var(--ink-2); }
+.focus-actions { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+.focus-hint { font-size: 12.5px; color: var(--ink-3); }
+
+.focus-body {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1.6fr) minmax(320px, 1fr);
+  gap: 14px;
+  padding: 14px;
+  min-height: 0;
+}
+
+.focus-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.focus-tools .tool-tip { margin: 0; padding: 10px 12px; font-size: 12.5px; line-height: 1.55; }
+
+@media (max-width: 980px) {
+  .focus-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(240px, 1fr) auto; }
+  .focus-tools { flex-direction: row; flex-wrap: wrap; align-items: flex-start; }
+  .focus-tools .btn { flex: 1; min-width: 96px; }
+  .focus-tools .tool-tip { flex: 1 1 100%; }
+}
+
+.focus-stage {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  min-height: 0;
+}
+
+.focus-stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+.stage-tools--large { right: 18px; bottom: 18px; gap: 10px; }
+.orbit-pad--large { width: 96px; height: 96px; }
+.orbit-pad--large svg { width: 42px; height: 42px; }
+.orbit-pad--large span { font-size: 12px; }
+.view-reset--large { height: 38px; padding: 0 14px; font-size: 13.5px; }
+.view-reset--large svg { width: 16px; height: 16px; }
+
+.focus-views {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ============================================================================
+   平板 / 触屏：手指比鼠标粗，所有可点目标放大
+   ========================================================================= */
+
+@media (pointer: coarse) {
+  .btn { min-height: 50px; font-size: 15.5px; }
+  .tool-list .btn { min-height: 56px; font-size: 16.5px; }
+  .orbit-pad { width: 86px; height: 86px; }
+  .orbit-pad svg { width: 36px; height: 36px; }
+  .orbit-pad span { font-size: 11.5px; }
+  .view-reset { height: 44px; padding: 0 14px; font-size: 13px; }
+  .view-reset svg { width: 16px; height: 16px; }
+  .chip { font-size: 13px; padding: 6px 12px; }
+}
+
+/* 平板横屏（1024~1366）：三栏收窄一点，舞台优先 */
+@media (max-width: 1366px) and (min-width: 981px) {
+  .workspace { grid-template-columns: 168px minmax(0, 1fr) 344px; gap: 12px; padding: 12px; }
+  .tool-tip { display: none; }
+}
+
+/* 一体机 / 大屏：整体放大，站远也能看清 */
+@media (min-width: 1600px) {
+  body { font-size: 16px; }
+  :root { --topbar-h: 64px; }
+  .workspace { grid-template-columns: 210px minmax(0, 1fr) 440px; gap: 16px; padding: 16px; }
+  .btn { min-height: 44px; font-size: 15px; }
+  .tool-list .btn { min-height: 52px; font-size: 16px; }
+  .tool-tip { font-size: 13.5px; }
+  .chip { font-size: 13.5px; padding: 6px 12px; }
+  .drag-source { min-height: 44px; }
+  .gate h1 { font-size: 42px; }
+  .gate-grid button { min-height: 120px; }
+  .gate-grid .n { font-size: 40px; }
+  .group-card .name { font-size: 17px; }
+  .group-card .count { font-size: 14.5px; }
+  .group-card .when { font-size: 13.5px; }
+}
+
+@media (min-width: 2200px) {
+  body { font-size: 17px; }
+  .workspace { grid-template-columns: 240px minmax(0, 1fr) 520px; }
+  .tool-list .btn { min-height: 60px; font-size: 18px; }
+  .orbit-pad { width: 116px; height: 116px; }
+  .orbit-pad svg { width: 52px; height: 52px; }
+}
+
+/* 窄屏（竖屏平板 / 手机）：放大演示改成上下排 */
+@media (max-width: 980px) {
+  .focus-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(240px, 44vh) auto; }
+  .focus-layer { overflow-y: auto; }
+  .focus-bar { position: sticky; top: 0; z-index: 2; }
+  .focus-hint { display: none; }
+  .orbit-pad { right: 10px; bottom: 10px; }
+}
+
+@media (max-width: 640px) {
+  /* 小屏上格子本来就小，视角球缩小并半透明，避免挡住右前角 */
+  .stage-tools { right: 8px; bottom: 8px; gap: 6px; }
+  .orbit-pad {
+    width: 64px;
+    height: 64px;
+    background: rgba(255, 255, 255, .9);
+  }
+  .orbit-pad svg { width: 26px; height: 26px; }
+  .orbit-pad span { font-size: 10px; }
+  .view-reset { height: 40px; padding: 0 11px; font-size: 12px; }
+}

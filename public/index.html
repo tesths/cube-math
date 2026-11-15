@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>正方体三视图 · 学生端</title>
+<meta name="description" content="摆正方体，看三视图。课堂互动教具。">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/css/style.css">
+<script src="/config.js"></script>
+<script>
+  // 首屏防闪：已经选过组就直接显示工作区，避免先闪一下选组页
+  try {
+    var reset = /[?&]reset\b/.test(location.search);
+    var fromUrl = /[?&]group=([1-8])\b/.exec(location.search);
+    var bound = Number(localStorage.getItem('cube-views:group'));
+    // 地址栏里的 ?group= 也算已认领（老师可以直接发链接给学生）
+    if (!reset && (fromUrl || (bound >= 1 && bound <= 8))) {
+      document.documentElement.classList.add('has-group');
+    }
+  } catch (e) {
+    // 隐私模式下 localStorage 不可用：地址栏里有 ?group= 就照常进工作区
+    if (/[?&]group=([1-8])\b/.test(location.search) && !/[?&]reset\b/.test(location.search)) {
+      document.documentElement.classList.add('has-group');
+    }
+  }
+</script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "/vendor/three.module.js",
+    "three/addons/": "/vendor/addons/"
+  }
+}
+</script>
+</head>
+<body>
+<!--
+  方向契约 · 正方体三视图
+  THESIS      这个界面属于"方格纸与制图"，不属于彩色儿童 App。它拒绝的默认式样是：
+              圆角糖果色 + 立体卡通插画 + 到处飘的奖励动效。
+  OWN-WORLD   肉色偏黄底 #f7ecdd；暖褐 #8c5a2b 是主色；砖红 #b3402a 只表示危险动作；
+              点中的积木变橙 #f97316；
+              等宽字体只留给真实数据（格数、块数、时间）；方块＝单色实体 + 深色描边。
+  STORY       进门先认领自己的组（认领后锁定）→ 拖方块搭形状 → 点一下看三视图 →
+              发现和想象不一样，回去改。老师一屏扫完 8 个组，点某组可放大讲课。
+  FIRST VIEWPORT  未认领时是首页：一句"你是第几组"+ 8 个大按钮。
+              认领后是工作区：顶栏（组号 / 保存状态）＋ 左侧三个工具 ＋ 中间 3D 舞台 ＋ 右侧三视图。
+  FORM        操作型界面（Operate），走"技术制图"这一支；概念种子脚本依赖线上目录，
+              本机不可达（两次运行均无输出，已披露），方向由 PRODUCT.md 的事实直接定。
+  FINISH      未经检查与记录的构建未完成；本次以截图复核 + DESIGN.md 收尾。
+-->
+
+<!-- 首页：认领自己的组。选过之后就锁定，不再提供"换组"，避免学生误点到别的组。 -->
+<div class="gate" id="gate">
+  <div class="gate-inner">
+    <h1>你是第几组？</h1>
+    <p class="lede">点一下自己的组号就能开始摆放正方体，不用账号也不用密码。老师会在他的屏幕上一眼看到 8 个组的进展。</p>
+    <div class="gate-grid" id="groupGrid"></div>
+    <p class="gate-note">选好之后这台电脑就固定在这一组，不能再改。选错了请找老师。</p>
+  </div>
+  <div class="gate-foot">
+    <span>一个组用一台电脑 · 正方体三视图</span>
+    <a class="gate-teacher" href="/teacher">教师端入口 →</a>
+  </div>
+</div>
+
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true">
+        <polygon points="16,3 28,10 16,17 4,10" fill="#f6e3cb"/>
+        <polygon points="4,10 16,17 16,29 4,22" fill="#e8c9a4"/>
+        <polygon points="28,10 16,17 16,29 28,22" fill="#cfa87b"/>
+        <path d="M16 3 L28 10 L28 22 L16 29 L4 22 L4 10 Z M4 10 L16 17 L28 10 M16 17 L16 29"
+              fill="none" stroke="#8c5a2b" stroke-width="1.6" stroke-linejoin="round"/>
+      </svg>
+      正方体三视图
+      <small>学生端</small>
+    </div>
+
+    <div class="group-chip">
+      <span id="groupLabel">第 1 组</span>
+    </div>
+
+
+    <div class="spacer"></div>
+
+    <div class="status" id="status" data-state="loading" role="status" aria-live="polite">
+      <span class="dot"></span><span id="statusText">连接中…</span>
+    </div>
+  </header>
+
+  <div class="task-bar">
+    <nav class="task-tabs" id="taskTabs" aria-label="选择任务">
+      <button class="task-tab" type="button" data-task="1" aria-pressed="false">任务一</button>
+      <button class="task-tab" type="button" data-task="2" aria-pressed="false">任务二</button>
+      <button class="task-tab" type="button" data-task="3" aria-pressed="false">任务三</button>
+    </nav>
+  </div>
+
+  <main class="workspace">
+    <section class="panel palette" aria-label="工具">
+      <div class="tool-list">
+        <button class="btn btn-block" id="actionBtn" type="button" aria-pressed="false">移动</button>
+        <button class="btn btn-block" id="resetBtn" type="button">重置</button>
+      </div>
+      <p class="tool-tip" id="toolTip">打开「移动」后，点中一块再点目标格子就能挪过去；也可以直接拖动。「重置」回到这个任务最初的样子。</p>
+    </section>
+
+    <section class="panel stage" id="stage" aria-label="摆放区" data-placing="false">
+      <canvas id="scene" tabindex="0" role="application"
+              aria-label="摆放区：点一块方块选中它；打开「移动」后点目标格子即可挪过去，也可以直接拖动"></canvas>
+      <div class="stage-stat">
+        <span class="chip strong" id="cubeCount">0 块</span>
+        <span class="chip" id="spaceHint">区域 5×5 格，最高 5 层</span>
+      </div>
+      <div class="stage-hint">
+        <span class="chip" id="placingHint" hidden>连续放置中 · 点「小方块」或按 Esc 结束</span>
+        <span class="chip" id="kbHint" hidden>方向键选格子 · 回车把选中的方块挪过去</span>
+      </div>
+
+      <div class="stage-tools">
+        <button class="view-reset" id="resetView" type="button"
+                aria-label="回到正面视角" title="回到正面视角">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3.5 12a8.5 8.5 0 1 0 2.9-6.4"/>
+            <path d="M3.5 4v4.6h4.6"/>
+          </svg>
+          <span>复位</span>
+        </button>
+        <button class="orbit-pad" id="orbitPad" type="button"
+                aria-label="按住拖动可以转视角" title="按住拖动转视角">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <circle cx="24" cy="24" r="18" fill="none" stroke="currentColor" stroke-width="2"/>
+            <ellipse cx="24" cy="24" rx="8" ry="18" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".75"/>
+            <path d="M6 24h36M9 14.5h30M9 33.5h30" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".75"/>
+            <path d="M24 2.5v5M24 40.5v5M2.5 24h5M40.5 24h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span>转视角</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="panel view-panel" aria-label="三视图">
+      <div class="view-head">
+        <button class="btn btn-primary btn-block" id="showViews" type="button" aria-pressed="false">看三视图</button>
+      </div>
+      <div class="view-placeholder" id="viewPlaceholder">
+        <strong>搭好了吗？</strong>
+        <p>点上面的按钮，一次就能看到这个图形从正面、左面、上面看分别是什么样子。</p>
+      </div>
+      <div class="views-grid" id="viewsGrid" hidden></div>
+      <p class="view-foot" id="viewFoot" hidden>方格图里一格就是一个方块；三张图用的是同一个格子大小，可以直接比宽窄。</p>
+    </section>
+  </main>
+</div>
+
+<script type="module" src="/js/student/app.js"></script>
+</body>
+</html>
