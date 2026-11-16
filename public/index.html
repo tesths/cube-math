@@ -34,16 +34,12 @@
 }
 </script>
 <!-- 关键模块预加载：并行下载，消除 import 串行瀑布（高延迟/低带宽网络下收益很大） -->
+<link rel="preconnect" href="https://registry.npmmirror.com" crossorigin>
+<link rel="dns-prefetch" href="//registry.npmmirror.com">
 <link rel="modulepreload" href="https://registry.npmmirror.com/three/0.186.1/files/build/three.module.js" crossorigin>
 <link rel="modulepreload" href="https://registry.npmmirror.com/three/0.186.1/files/build/three.core.js" crossorigin>
 <link rel="modulepreload" href="https://registry.npmmirror.com/three/0.186.1/files/examples/jsm/controls/OrbitControls.js" crossorigin>
-<link rel="modulepreload" href="/js/shared/view.js">
-<link rel="modulepreload" href="/js/shared/model.js">
-<link rel="modulepreload" href="/js/shared/net.js">
-<link rel="modulepreload" href="/js/student/camera-fit.js">
-<link rel="modulepreload" href="/js/student/stage.js">
-<link rel="modulepreload" href="/js/student/views.js">
-<link rel="modulepreload" href="/js/student/app.js">
+<link rel="modulepreload" href="/js/student/app.bundle.js">
 </head>
 <body>
 <!--
@@ -177,6 +173,6 @@
   </main>
 </div>
 
-<script type="module" src="/js/student/app.js"></script>
+<script type="module" src="/js/student/app.bundle.js"></script>
 </body>
 </html>

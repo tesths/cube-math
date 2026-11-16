@@ -5,6 +5,8 @@
   "type": "module",
   "description": "正方体摆放 + 三视图 教学网站（学生端 / 教师端）",
   "scripts": {
+    "build:web": "node scripts/build-web.mjs",
+    "prestart": "node scripts/build-web.mjs",
     "start": "node server.js",
     "dev": "node --watch server.js",
     "vendor": "node scripts/vendor-three.mjs",
