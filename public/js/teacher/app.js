@@ -6,7 +6,7 @@ import { MiniStage } from './mini.js';
 import { CubeStage } from '../student/stage.js';
 import { ViewCards } from '../student/views.js';
 import { openStateStream, fetchState, saveGroup } from '../shared/net.js';
-import { sanitizeLoose, collapseColumns, taskInitial, taskMeta, normalizeTask } from '../shared/model.js';
+import { sanitizeLoose, collapseColumns, taskInitial, taskMeta, normalizeTask, extraCells } from '../shared/model.js';
 
 const GROUP_COUNT = 8;
 const $ = (id) => document.getElementById(id);
@@ -196,7 +196,7 @@ function applyState(state) {
     entry.empty.hidden = cubes.length > 0;
     entry.card.dataset.empty = String(cubes.length === 0);
     // 只有内容真的变了才重建 mesh：轮询模式下每 2 秒重建 8 张卡很浪费
-    if (changed) entry.stage.setCubes(cubes);
+    if (changed) entry.stage.setCubes(cubes, extraCells(task, cubes));
 
     if (changed && entry.initialized) {
       entry.card.dataset.updated = 'true';
@@ -262,6 +262,7 @@ function openFocus(group) {
   requestAnimationFrame(() => {
     focus.stage.resetView();
     focus.stage.setCubes(focus.cubes);
+    focus.stage.setHighlight(extraCells(focus.task, focus.cubes)[0] || null);
     focus.views.setCubes(focus.cubes);
     focus.views.render();
   });
@@ -307,6 +308,7 @@ function commitFocus(next) {
   focus.dirty = true;
   focus.lastEditAt = Date.now();
   focus.stage.setCubes(clean);
+  focus.stage.setHighlight(extraCells(focus.task, clean)[0] || null);
   focus.views.setCubes(clean);
   focus.views.render();
   els.focusMeta.textContent = `${taskMeta(focus.task).name} · ${describe(clean)}`;
@@ -334,7 +336,7 @@ async function flushFocus() {
         entry.count.textContent = describe(cubes);
         entry.empty.hidden = cubes.length > 0;
         entry.card.dataset.empty = String(cubes.length === 0);
-        entry.stage.setCubes(cubes);
+        entry.stage.setCubes(cubes, extraCells(focus.task, cubes));
       }
     }
   } catch (err) {
@@ -379,6 +381,7 @@ function refreshFocus(state) {
     focus.views.setCubes(cubes);
     focus.views.render();
   }
+  focus.stage.setHighlight(extraCells(focus.task, focus.cubes)[0] || null);
 }
 
 els.focusActionBtn.addEventListener('click', () => {

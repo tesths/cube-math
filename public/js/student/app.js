@@ -6,7 +6,7 @@
  */
 import { CubeStage } from './stage.js';
 import { ViewPanel } from './views.js';
-import { sanitizeLoose, collapseColumns, taskInitial, taskMeta, normalizeTask } from '../shared/model.js';
+import { sanitizeLoose, collapseColumns, taskInitial, taskMeta, normalizeTask, extraCells } from '../shared/model.js';
 import { openStateStream, saveGroup, saveGroupBeacon, fetchState, fetchSettings } from '../shared/net.js';
 
 const GROUP_COUNT = 8;
@@ -302,6 +302,19 @@ function enterGroup(n) {
   syncUrl(n);
   document.documentElement.classList.add('has-group');
   els.gate.hidden = true;
+
+  // 练习模式：也必须先选组（扫码→首页选组），选完只显示任务0；本地保存，不读写服务器
+  if (app.viewMode === 'training') {
+    els.groupLabel.textContent = `第 ${n} 组 · 练习`;
+    app.task = 0;
+    app.cubes = readTask0();
+    if (!app.stage) initWorkspace();
+    renderTaskUi();
+    renderLocal();
+    setStatus('saved', '练习模式 · 只在本机保存');
+    return;
+  }
+
   els.groupLabel.textContent = `第 ${n} 组`;
 
   const mine = app.serverGroups.get(n);
@@ -560,6 +573,8 @@ function commit(next) {
 function renderLocal() {
   app.stage.setCubes(app.cubes);
   app.panel.setCubes(app.cubes);
+  // 任务三新添的那块标粉：由数据推导，刷新/重新进入也会保持粉色
+  app.stage.setHighlight(extraCells(app.task, app.cubes)[0] || null);
   els.cubeCount.textContent = `${app.cubes.length} 块`;
 }
 
@@ -675,13 +690,6 @@ async function boot() {
   // 与"读服务器设置"并行拉一次组状态，少等一次网络往返（首屏更快）
   const groupsReady = refreshServerGroups();
   app.viewMode = await resolveViewMode();
-
-  // 练习模式：只显示任务0，本地练习，不需要/不影响任何组的正式数据（也不连服务器）
-  if (app.viewMode === 'training') {
-    startPractice();
-    return;
-  }
-
   await groupsReady;
 
   const params = new URLSearchParams(location.search);
@@ -693,36 +701,20 @@ async function boot() {
     unbind();   // 清 localStorage + 从地址栏去掉 group/reset
   }
 
-  await refreshServerGroups();
-
   // 优先级：地址栏的 ?group= > localStorage > 首页
   // 地址栏优先是刻意的：老师把 URL 改成 ?group=6，这台机器就换到第 6 组。
   const urlGroup = wantsReset ? presetGroup : groupFromParams(new URLSearchParams(location.search));
   const initial = wantsReset ? (presetGroup ?? readBound()) : (urlGroup ?? readBound());
 
+  // 不管什么任务（含任务0 练习），都先选组：有组才进工作区，没有就停在首页
   if (initial) {
     enterGroup(initial);
   } else {
     els.gate.hidden = false;
   }
 
-  connectStream();
-}
-
-/** 练习模式（任务0）：本地操作、四个按钮都能用，不读/写服务器 */
-function startPractice() {
-  app.viewMode = 'training';
-  app.group = null;
-  app.bound = false;
-  document.documentElement.classList.add('has-group');
-  els.gate.hidden = true;
-  els.groupLabel.textContent = '练习模式';
-  app.task = 0;
-  app.cubes = readTask0();
-  if (!app.stage) initWorkspace();
-  renderTaskUi();
-  renderLocal();
-  setStatus('saved', '练习模式 · 只在本机保存');
+  // 练习模式是本地的，不需要连服务器同步
+  if (app.viewMode !== 'training') connectStream();
 }
 
 boot();

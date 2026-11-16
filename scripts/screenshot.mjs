@@ -687,7 +687,12 @@ await trainCtx.addInitScript(() => {
 });
 const tpage = hook(await trainCtx.newPage());
 await tpage.goto(`${BASE}/`, { waitUntil: 'load' });
-await tpage.waitForTimeout(1100);
+await tpage.waitForTimeout(900);
+// 任务0 也必须先选组（扫码→首页→选组）
+if ((await tpage.locator('.task-tab:visible').count()) === 0) {
+  await tpage.locator('#groupGrid button:has-text("第 2 组")').click();
+  await tpage.waitForTimeout(900);
+}
 const tTabs = await tpage.locator('.task-tab:visible').allTextContents();
 if (tTabs.length !== 1 || tTabs[0].trim() !== '任务0') errors.push(`[练习] 应只显示任务0（${tTabs.join('/')}）`);
 if ((await tpage.locator('.tool-mode-btn:visible').count()) !== 3) errors.push('[练习] 应有移动/拿走/添上三个工具');

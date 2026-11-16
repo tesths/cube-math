@@ -24,6 +24,8 @@ const geo = new THREE.BoxGeometry(1, 1, 1);
 const edgeGeo = new THREE.EdgesGeometry(geo);
 // 与学生端同一套 1px 描边 / 面偏移：8 张小卡片上每条边都稳定可见
 const matCube = new THREE.MeshLambertMaterial({ color: 0xf7efa0, ...CUBE_FACE });
+// 学生新添的积木（任务三）在教师端也显示粉色
+const matPink = new THREE.MeshLambertMaterial({ color: 0xeec0d1, ...CUBE_FACE });
 const matEdge = makeEdgeMaterial();
 const baseGeo = new THREE.PlaneGeometry(LIMITS.sizeX, LIMITS.sizeZ);
 // 地面同样往后推深度，方块贴地的底边才不会被地面挡掉
@@ -227,11 +229,12 @@ export class MiniStage {
     }
   };
 
-  setCubes(cubes) {
+  setCubes(cubes, colored = []) {
     this.cubes = cubes;
+    const pinkKeys = new Set((colored ?? []).map((c) => c.join(',')));
     this.group.clear();
     for (const [x, y, z] of cubes) {
-      const mesh = new THREE.Mesh(geo, matCube);
+      const mesh = new THREE.Mesh(geo, pinkKeys.has(`${x},${y},${z}`) ? matPink : matCube);
       mesh.position.set(x - OFF_X, y + 0.5, z - OFF_Z);
       const outline = new THREE.LineSegments(edgeGeo, matEdge);
       outline.renderOrder = EDGE_RENDER_ORDER;

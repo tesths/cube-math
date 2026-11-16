@@ -13,10 +13,9 @@
   try {
     var reset = /[?&]reset\b/.test(location.search);
     var fromUrl = /[?&]group=([1-8])\b/.exec(location.search);
-    var training = localStorage.getItem('cube-views:mode') === 'training';
     var bound = Number(localStorage.getItem('cube-views:group'));
-    // 地址栏里的 ?group= 也算已认领；练习模式直接进工作区，避免闪一下选组页
-    if (!reset && (training || fromUrl || (bound >= 1 && bound <= 8))) {
+    // 不管什么任务（含任务0 练习），都先选组：地址栏带 ?group= 或本机已绑定才直接进工作区
+    if (!reset && (fromUrl || (bound >= 1 && bound <= 8))) {
       document.documentElement.classList.add('has-group');
     }
   } catch (e) {
