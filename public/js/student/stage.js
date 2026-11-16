@@ -411,6 +411,34 @@ export class CubeStage {
     this.ghostGroup.add(this.ghostMesh, edges);
     this.ghostGroup.visible = false;
     this.scene.add(this.ghostGroup);
+
+    // 「原来在哪」的淡虚线框（任务一移动后 / 任务二拿走后的空位）：纯视觉提示，不进三视图
+    this.traceGroup = new THREE.Group();
+    this.scene.add(this.traceGroup);
+    this._traceKey = '';
+    this.traceGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
+    this.traceMat = new THREE.LineDashedMaterial({
+      color: 0xb08a5a, dashSize: 0.16, gapSize: 0.12,
+      transparent: true, opacity: 0.55, depthWrite: false,
+    });
+  }
+
+  /** 在若干空格子画淡虚线立方框（"从哪移走/拿走"），传 [] 清除。 */
+  setTraceCells(cells) {
+    const list = Array.isArray(cells) ? cells : [];
+    const keyText = list.map((c) => c.join(',')).sort().join(';');
+    if (keyText === this._traceKey) return;
+    this._traceKey = keyText;
+    this.traceGroup.clear();
+    for (const [x, y, z] of list) {
+      const line = new THREE.LineSegments(this.traceGeo, this.traceMat);
+      line.raycast = () => {};            // 绝不挡点击/拾取
+      line.computeLineDistances();        // 虚线必须算 lineDistance
+      toWorld(x, y, z, line.position);
+      line.renderOrder = EDGE_RENDER_ORDER;
+      this.traceGroup.add(line);
+    }
+    this.needsRender = true;
   }
 
   _observeResize() {

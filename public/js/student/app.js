@@ -6,7 +6,7 @@
  */
 import { CubeStage } from './stage.js';
 import { ViewPanel } from './views.js';
-import { sanitizeLoose, collapseColumns, taskInitial, taskMeta, normalizeTask, extraCells } from '../shared/model.js';
+import { sanitizeLoose, collapseColumns, taskInitial, taskMeta, normalizeTask, extraCells, missingCells } from '../shared/model.js';
 import { openStateStream, saveGroup, saveGroupBeacon, fetchState, fetchSettings } from '../shared/net.js';
 
 const GROUP_COUNT = 8;
@@ -62,6 +62,7 @@ const app = {
   viewMode: 'formal',    // 'formal' | 'training'（设置页切换）
   task: 1,               // 0=练习（本地） 1=移动 2=拿走 3=添上
   tasks: {},             // 任务1/2/3 各自的进度（切任务不丢）
+  traceCells: null,      // 本次操作"原来的位置"（画淡虚线；null=按数据自动推导）
   mode: 'none',          // 'none' | 'move' | 'erase' | 'place'
 };
 
@@ -307,6 +308,7 @@ function enterGroup(n) {
   syncUrl(n);
   document.documentElement.classList.add('has-group');
   els.gate.hidden = true;
+  app.traceCells = null;
 
   // 练习模式：也必须先选组（扫码→首页选组），选完只显示任务0；本地保存，不读写服务器
   if (app.viewMode === 'training') {
@@ -358,6 +360,7 @@ function initWorkspace() {
       }
       const next = app.cubes.filter((c) => key(c) !== key(from));
       next.push(to);
+      app.traceCells = [from];         // 记下"从哪移走"，画淡虚线
       commit(next);
       if (app.task === 1) {
         // 任务1 只能移动 1 块：移完就锁定，要再移必须"重置木块"
@@ -409,6 +412,7 @@ function initWorkspace() {
     setMode('none');
     app.stage.setSelected(null);
     app.stage.setHighlight(null);
+    app.traceCells = null;        // 重置后清掉"原位置"虚线
     commit(taskInitial(app.task));
     renderTaskUi();               // 重置后刷新按钮（任务1/3 解锁）
     setStatus('saved', '已重置');
@@ -453,6 +457,7 @@ function handlePlace(pos) {
     return;
   }
   const before = new Set(app.cubes.map(key));
+  app.traceCells = null;               // 添上是新增，不需要"原位置"虚线
   commit([...app.cubes, pos]);
   if (app.task === 3 && !before.has(key(pos))) {
     app.stage.setHighlight(pos);      // 新添的积木标粉
@@ -468,6 +473,7 @@ function handleDelete(pos) {
     showGuideReminder('任务二只能拿走一个木块；要重新来请点「重置木块」');
     return;
   }
+  app.traceCells = [pos];              // 记下"拿走的原位置"，画淡虚线
   commit(app.cubes.filter((c) => key(c) !== key(pos)));
 }
 
@@ -561,6 +567,7 @@ function switchTask(value) {
   setMode('none');
   app.stage.setSelected(null);
   app.stage.setHighlight(null);
+  app.traceCells = null;
   app.cubes = pipeline(app.tasks[task] ?? taskInitial(task));
   app.tasks[task] = app.cubes;
   app.lastEditAt = Date.now();
@@ -600,6 +607,8 @@ function renderLocal() {
   app.panel.setCubes(app.cubes);
   // 任务三新添的那块标粉：由数据推导，刷新/重新进入也会保持粉色
   app.stage.setHighlight(extraCells(app.task, app.cubes)[0] || null);
+  // 任务一移动后 / 任务二拿走后的"原来位置"用淡虚线框提示（不影响三视图）
+  app.stage.setTraceCells(app.traceCells ?? missingCells(app.task, app.cubes));
   els.cubeCount.textContent = `${app.cubes.length} 块`;
 }
 

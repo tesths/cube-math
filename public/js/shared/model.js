@@ -125,6 +125,20 @@ export function extraCells(task, cubes) {
   return (cubes ?? []).filter((c) => !init.has(c.join(',')));
 }
 
+/**
+ * "原来的位置"——初始图形里有、但现在空出来的格子（用来画淡淡的虚线框）：
+ *   - 任务一：移动后空出来的"出发格"；
+ *   - 任务二：拿走木块后空出来的那一格；
+ *   - 任务0（练习）：移动/拿走留下的空位。
+ * 任务三（只添上）没有"消失的位置"，返回空。纯视觉提示，不影响三视图。
+ */
+export function missingCells(task, cubes) {
+  const id = normalizeTask(task);
+  if (id !== 0 && id !== 1 && id !== 2) return [];
+  const cur = new Set((cubes ?? []).map((c) => c.join(',')));
+  return taskInitial(id).filter((c) => !cur.has(c.join(',')));
+}
+
 /** 坐标 -> Set 里用的字符串键 */
 export function keyOf(x, y, z) {
   return `${x},${y},${z}`;
