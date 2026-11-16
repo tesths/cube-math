@@ -113,13 +113,15 @@ export function defaultCubes() {
 }
 
 /**
- * "新添的、需要标色的方块"：任务三初始 4 块，学生只能再添 1 块，
- * 比初始多出来的那块就是新添的（标粉色）。教师端据此在卡片/放大演示里也显示粉色。
- * 其它任务（移动/拿走/练习）没有"新增方块"的概念，返回空。
+ * "被操作过、需要标色的方块"（教师端也会同步显示粉色）：
+ *   - 任务三（添上）：比初始 4 块多出来的那块 = 学生新添的；
+ *   - 任务一（移动）：比初始位置多的那格 = 学生移动后的新位置（只允许移动 1 块）；
+ *   - 其它任务没有"新增位置"概念，返回空。
  */
 export function extraCells(task, cubes) {
-  if (normalizeTask(task) !== 3) return [];
-  const init = new Set(taskInitial(3).map((c) => c.join(',')));
+  const id = normalizeTask(task);
+  if (id !== 1 && id !== 3) return [];
+  const init = new Set(taskInitial(id).map((c) => c.join(',')));
   return (cubes ?? []).filter((c) => !init.has(c.join(',')));
 }
 

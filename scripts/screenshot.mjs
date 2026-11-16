@@ -571,22 +571,29 @@ if (JSON.stringify(afterReload) !== JSON.stringify(movedCubes)) {
 }
 
 console.log('\n回归：键盘把选中的方块挪过去');
-const kbCubes = await stateOf(5);
-await stack.click('.tool-mode-btn:visible');   // 键盘移动也要求先点亮「移动木块」
-await stack.waitForTimeout(200);
-const kbPick = screenOfCell(stackRect, kbCubes[0], kbCubes);
-await stack.mouse.click(kbPick.x, kbPick.y);
-await stack.waitForTimeout(300);
-const kbSelected = await stack.locator('#scene').getAttribute('data-selected');
-await stack.locator('#scene').focus();
-await stack.keyboard.press('ArrowRight');
-await stack.keyboard.press('ArrowRight');
-await stack.keyboard.press('Enter');
-await stack.waitForTimeout(900);
-const kbAfterCubes = await stateOf(5);
+// 任务一现在"只能移动一块"，用独立的一组（任务一初始）单独测键盘，避免复用已移动过的组
+await post(7, [[1, 0, 3], [1, 0, 2], [2, 0, 2], [3, 0, 2], [2, 0, 1], [1, 1, 2]], 1);
+const kbPage = await newPage2();
+await kbPage.goto(`${BASE}/?reset&group=7`, { waitUntil: 'load' });
+await kbPage.waitForTimeout(1300);
+const kbRect = await kbPage.locator('#scene').boundingBox();
+const kbCubes = await stateOf(7);
+await kbPage.click('.tool-mode-btn:visible');
+await kbPage.waitForTimeout(200);
+const kbPick = screenOfCell(kbRect, kbCubes[0], kbCubes);
+await kbPage.mouse.click(kbPick.x, kbPick.y);
+await kbPage.waitForTimeout(300);
+const kbSelected = await kbPage.locator('#scene').getAttribute('data-selected');
+await kbPage.locator('#scene').focus();
+await kbPage.keyboard.press('ArrowRight');
+await kbPage.keyboard.press('ArrowRight');
+await kbPage.keyboard.press('Enter');
+await kbPage.waitForTimeout(900);
+const kbAfterCubes = await stateOf(7);
 console.log(`  选中 ${JSON.stringify(kbSelected)}，回车后：${JSON.stringify(kbAfterCubes)}`);
-if (kbAfterCubes.length !== 3) errors.push(`[键盘] 数量变了（${kbAfterCubes.length}）`);
+if (kbAfterCubes.length !== 6) errors.push(`[键盘] 数量变了（${kbAfterCubes.length}）`);
 if (JSON.stringify(kbAfterCubes) === JSON.stringify(kbCubes)) errors.push('[键盘] 回车没有移动选中的方块');
+await kbPage.close();
 
 console.log('\n回归：取景装得下 5 层');
 await post(6, [[2, 0, 2], [2, 1, 2], [2, 2, 2], [2, 3, 2], [2, 4, 2]]);
@@ -711,6 +718,43 @@ await trainCtx.close();
 await fetch(`${BASE}/api/settings`, {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'formal' }),
 });
+
+// 回归：任务一只能移动一块（移完标粉+锁定，要再移需重置）
+console.log('\n回归：任务一只能移动一块');
+await post(8, T_A, 1);
+const mv = await newPage2();
+await mv.goto(`${BASE}/?reset&group=8`, { waitUntil: 'load' });
+await mv.waitForTimeout(1300);
+let mbox = await mv.locator('#scene').boundingBox();
+const mCubes = await stateOf(8);
+await mv.click('.tool-mode-btn:visible');            // 移动木块
+await mv.waitForTimeout(200);
+const topM = mCubes.reduce((b, c) => (c[1] > b[1] ? c : b), mCubes[0]);
+await mv.mouse.click(...Object.values(screenOfCell(mbox, topM, mCubes)));
+await mv.waitForTimeout(300);
+await mv.mouse.click(...Object.values(screenOfCell(mbox, [4, 0, 4], mCubes, { ground: true })));
+await mv.waitForTimeout(900);
+const mAfter = await stateOf(8);
+if (mAfter.length !== 6 || !mAfter.some((c) => c[0] === 4 && c[1] === 0 && c[2] === 4)) {
+  errors.push(`[任务一] 移动一块后应为 6 块且含 [4,0,4]（${JSON.stringify(mAfter)}）`);
+}
+const mLocked = await mv.locator('.tool-mode-btn[data-mode="move"]').getAttribute('data-locked');
+if (mLocked !== 'true') errors.push('[任务一] 移动一块后「移动木块」未锁定');
+await mv.click('.tool-mode-btn[data-mode="move"]');
+await mv.waitForTimeout(400);
+if (!/只能移动一个/.test((await mv.textContent('#guideToast')).trim())) errors.push('[任务一] 再移没有提示需重置');
+// 再尝试移动另一块（点击另一块再点空位）应无效
+await mv.mouse.click(...Object.values(screenOfCell(mbox, mAfter[0], mAfter)));
+await mv.waitForTimeout(200);
+await mv.mouse.click(...Object.values(screenOfCell(mbox, [0, 0, 4], mAfter, { ground: true })));
+await mv.waitForTimeout(500);
+if ((await stateOf(8)).length !== 6) errors.push('[任务一] 锁定后数量应仍为 6');
+// 重置解锁
+await mv.click('#resetBtn'); await mv.waitForTimeout(700);
+if ((await mv.locator('.tool-mode-btn[data-mode="move"]').getAttribute('data-locked')) === 'true') {
+  errors.push('[任务一] 重置后「移动木块」仍锁定');
+}
+await mv.close();
 
 // ---------------------------------------------------------------- 收尾
 const T1_CLEAN = [[1, 0, 3], [1, 0, 2], [2, 0, 2], [3, 0, 2], [2, 0, 1], [1, 1, 2]];

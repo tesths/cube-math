@@ -197,9 +197,14 @@ function fmtTime(ts) {
 
 /** 没先点工具按钮就点木块 / 按键盘：弹一条提醒，并把工具按钮再闪一下 */
 function showGuideReminder(message) {
-  const fallback = app.task === 0
-    ? '先点一个工具按钮（移动 / 拿走 / 添上），再操作木块'
-    : `先点左边的「${taskMeta(app.task).actionLabel}」按钮，再操作木块`;
+  let fallback;
+  if (app.task === 0) {
+    fallback = '先点一个工具按钮（移动 / 拿走 / 添上），再操作木块';
+  } else if (isLocked()) {
+    fallback = lockedMessage(taskMeta(app.task).action);
+  } else {
+    fallback = `先点左边的「${taskMeta(app.task).actionLabel}」按钮，再操作木块`;
+  }
   els.guideToast.textContent = message ?? fallback;
   els.guideToast.hidden = false;
 
@@ -347,13 +352,22 @@ function initWorkspace() {
   app.stage = new CubeStage(els.scene, {
     onPlace: (pos) => handlePlace(pos),
     onMove: (from, to) => {
+      if (app.task === 1 && isLocked()) {
+        showGuideReminder(lockedMessage('move'));
+        return;
+      }
       const next = app.cubes.filter((c) => key(c) !== key(from));
       next.push(to);
       commit(next);
-      app.stage.setSelected(to);   // 挪完继续选中新位置，便于连续调整
       if (app.task === 1) {
-        // 任务1：及时提示「再点按钮，移动结束」
-        showGuideReminder('已移动木块 · 再点一下「移动木块」结束移动');
+        // 任务1 只能移动 1 块：移完就锁定，要再移必须"重置木块"
+        app.stage.setSelected(null);
+        setMode('none');
+        renderTaskUi();
+        setStatus('saved', '已移动一块 · 需要「重置木块」才能再移');
+        showGuideReminder(lockedMessage('move'));
+      } else {
+        app.stage.setSelected(to);   // 挪完继续选中新位置，便于连续调整
       }
     },
     onDelete: (pos) => handleDelete(pos),
@@ -382,21 +396,21 @@ function initWorkspace() {
   for (const btn of els.toolButtons) {
     btn.addEventListener('click', () => {
       const action = btn.dataset.mode;
-      if (action === 'place' && isPlaceLocked()) {
-        showGuideReminder('任务三只能添加一个木块；要重新来请点「重置木块」');
+      if (isLocked() && action === taskMeta(app.task).action) {
+        showGuideReminder(lockedMessage(action));
         return;
       }
       setMode(app.mode === action ? 'none' : action);
     });
   }
 
-  // 「重置」= 回到当前任务最初的摆放（同时解锁任务3、清掉粉色高亮）
+  // 「重置」= 回到当前任务最初的摆放（解锁任务1/3、清掉粉色高亮）
   els.resetBtn.addEventListener('click', () => {
     setMode('none');
     app.stage.setSelected(null);
     app.stage.setHighlight(null);
     commit(taskInitial(app.task));
-    renderTaskUi();               // 重置后刷新按钮（任务3 的"添上"解锁）
+    renderTaskUi();               // 重置后刷新按钮（任务1/3 解锁）
     setStatus('saved', '已重置');
   });
 
@@ -417,15 +431,24 @@ function initWorkspace() {
   });
 }
 
-/** 任务3 是否已经添加过一块（用于锁定"添上"按钮） */
-function isPlaceLocked() {
-  return app.task === 3 && app.cubes.length - taskInitial(3).length >= 1;
+/** 是否已用完这一任务的"一次机会"（任务1 移动1块 / 任务3 添加1块） */
+function isLocked() {
+  if (app.task === 1) return extraCells(1, app.cubes).length >= 1;
+  if (app.task === 3) return app.cubes.length - taskInitial(3).length >= 1;
+  return false;
 }
 
-/** 放置（任务3 只允许添加一块，加完标粉并锁定） */
+/** 锁定后的提示语 */
+function lockedMessage(action) {
+  return action === 'move'
+    ? '任务一只能移动一个木块；要重新来请点「重置木块」'
+    : '任务三只能添加一个木块；要重新来请点「重置木块」';
+}
+
+/** 放置（任务3 只允许添加一块，加完标粉并锁定；任务0 无限制） */
 function handlePlace(pos) {
-  if (isPlaceLocked()) {
-    showGuideReminder('任务三只能添加一个木块；要重新来请点「重置木块」');
+  if (isLocked()) {
+    showGuideReminder(lockedMessage('place'));
     setMode('none');
     return;
   }
@@ -463,8 +486,7 @@ function syncModeButtons() {
   const action = taskMeta(app.task).action;
   const task0 = app.task === 0;
   const active = task0 ? app.mode !== 'none' : app.mode === action;
-  const locked = isPlaceLocked();
-  const placeBtn = els.toolButtons.find((b) => b.dataset.mode === 'place');
+  const locked = isLocked();
 
   for (const btn of els.toolButtons) {
     btn.setAttribute('aria-pressed', String(app.mode === btn.dataset.mode));
@@ -477,8 +499,9 @@ function syncModeButtons() {
   // 引导跟着工具状态变：没点亮 → 一直提示"先点按钮"并让按钮呼吸；点亮 → 换成"怎么操作"
   const guide = GUIDES[gk];
   if (locked) {
-    els.toolStep.textContent = '② 已添上一块 · 点「重置木块」可重来';
-    els.guideChip.textContent = '已添一块 · 需要「重置木块」才能再添';
+    const verb = action === 'move' ? '移动' : '添上';
+    els.toolStep.textContent = `② 已${verb}一块 · 点「重置木块」可重来`;
+    els.guideChip.textContent = `已${verb}一块 · 需要「重置木块」才能再${verb === '移动' ? '移' : '添'}`;
   } else {
     els.toolStep.textContent = app.mode !== 'none'
       ? '② 现在到舞台里操作木块'
@@ -490,10 +513,12 @@ function syncModeButtons() {
     btn.classList.toggle('is-idle', !locked && app.mode === 'none');
   }
 
-  // 任务3 只能添一块：加完后"添上"按钮变灰锁定；仍可点，点了提示需要重置
-  if (placeBtn) {
-    placeBtn.classList.toggle('is-locked', locked);
-    placeBtn.dataset.locked = String(locked);
+  // 任务1/任务3 只有一次机会：用完后对应按钮变灰锁定（仍可点，点了提示需要重置）
+  for (const btn of els.toolButtons) {
+    const isCurrent = !btn.hidden && btn.dataset.mode === action;
+    const isLockedBtn = isCurrent && locked;
+    btn.classList.toggle('is-locked', isLockedBtn);
+    btn.dataset.locked = String(isLockedBtn);
   }
 
   if (app.mode !== 'none') hideGuideReminder();
