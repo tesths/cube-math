@@ -672,6 +672,8 @@ function connectStream() {
 
 async function boot() {
   setStatus('loading', '连接中…');
+  // 与"读服务器设置"并行拉一次组状态，少等一次网络往返（首屏更快）
+  const groupsReady = refreshServerGroups();
   app.viewMode = await resolveViewMode();
 
   // 练习模式：只显示任务0，本地练习，不需要/不影响任何组的正式数据（也不连服务器）
@@ -679,6 +681,8 @@ async function boot() {
     startPractice();
     return;
   }
+
+  await groupsReady;
 
   const params = new URLSearchParams(location.search);
   const wantsReset = params.has('reset');

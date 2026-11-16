@@ -79,7 +79,7 @@ try {
 
   // ---------- 1. 首页
   await page.goto(`${BASE}/?reset`, { waitUntil: 'load', timeout: 60000 });
-  await page.waitForTimeout(1500);
+  await page.waitForTimeout(2600);
   check('首页显示选组', await page.locator('#gate').isVisible());
   check('首页 8 个组按钮', (await page.locator('#groupGrid button').count()) === 8);
   check('首页有教师端入口', (await page.locator('#gate a[href="/teacher"]').count()) === 1);
@@ -131,7 +131,7 @@ try {
   check('任务二拿走一块 → 5 块', (await page.textContent('#cubeCount')).trim() === '5 块', await page.textContent('#cubeCount'));
   await page.waitForTimeout(1600);   // 等自动保存落库（Vercel 冷启动可能慢）
   await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(1300);
+  await page.waitForTimeout(1800);
   st = await scene(3);
   check('刷新后任务/块数都保留（任务二 5 块）', st.task === 2 && st.cubes.length === 5, `task=${st.task} ${st.cubes.length} 块`);
 
@@ -149,7 +149,7 @@ try {
   check('任务三添一块 → 5 块', (await page.textContent('#cubeCount')).trim() === '5 块', await page.textContent('#cubeCount'));
   await page.waitForTimeout(1600);   // 等自动保存落库
   await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(1300);
+  await page.waitForTimeout(1800);
   st = await scene(3);
   check('刷新后任务三 5 块保留', st.task === 3 && st.cubes.length === 5, `task=${st.task} ${st.cubes.length} 块`);
 
@@ -195,7 +195,7 @@ try {
 
   // 重置
   await page.click('#resetBtn');
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(1800);
   st = await scene(3);
   check('重置回到任务一初始 6 块', st.cubes.length === 6 && norm(st.cubes) === norm(T1), `${st.cubes.length} 块`);
 
@@ -229,7 +229,7 @@ try {
   // 学生移动 → 教师端卡片变化（用固定数据，避免受前面步骤影响）
   await postGroup(3, T1, 1);
   await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(1400);
+  await page.waitForTimeout(2400);
   const cardStage = teacher.locator('.group-card[data-group="3"] .card-stage');
   const cardA = await cardStage.screenshot();
 
