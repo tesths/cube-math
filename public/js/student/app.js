@@ -12,7 +12,7 @@ import { openStateStream, saveGroup, saveGroupBeacon, fetchState, fetchSettings 
 const GROUP_COUNT = 8;
 const LS_KEY = 'cube-views:group';
 const LS_MODE = 'cube-views:mode';        // 'training'(只显示任务0) | 'formal'(任务1·2·3)
-const LS_TASK0 = 'cube-views:task0';      // 任务0（练习）的本地进度，不写服务器
+const LS_TASK0 = 'cube-views:task0';      // 任务0（练习）的本机兜底进度；同时同步到服务器单独槽 0
 const SAVE_DEBOUNCE = 350;
 const ADOPT_REMOTE_AFTER = 1200;   // 自己刚改完的这段时间内忽略服务器回声，免得和手速打架
 
@@ -245,7 +245,7 @@ function renderGate() {
   els.groupGrid.replaceChildren();
   for (let i = 1; i <= GROUP_COUNT; i++) {
     const info = app.serverGroups.get(i);
-    const active = normalizeTask(info?.task);
+    const active = app.viewMode === 'training' ? 0 : normalizeTask(info?.task);
     const n = info?.tasks?.[active]?.length ?? 0;
 
     const btn = document.createElement('button');
@@ -318,7 +318,11 @@ function enterGroup(n) {
     if (!app.stage) initWorkspace();
     renderTaskUi();
     renderLocal();
-    setStatus('saved', '练习模式 · 只在本机保存');
+    // 任务0 也同步到服务器（单独一槽，不影响任务1/2/3），教师端才能看到学生在练习什么。
+    // 本地 localStorage 仍保留一份，离线也不丢。
+    app.dirty = true;
+    scheduleSave();
+    setStatus('saving', '正在同步…');
     return;
   }
 
@@ -588,10 +592,7 @@ function commit(next) {
 
   app.cubes = clean;
   if (app.task === 0) {
-    // 任务0 是本地练习：只存本机，不写服务器
-    saveTask0(clean);
-    renderLocal();
-    return;
+    saveTask0(clean);   // 本地兜底：离线 / 隐私模式下也不丢
   }
 
   app.tasks[app.task] = clean;   // 只更新当前任务这一槽
@@ -613,7 +614,7 @@ function renderLocal() {
 }
 
 function scheduleSave() {
-  if (app.task === 0 || !app.group) return;   // 本地练习不保存
+  if (!app.group) return;
   setStatus('saving', '正在保存…');
   clearTimeout(app.saveTimer);
   app.saveTimer = setTimeout(flushSave, SAVE_DEBOUNCE);
@@ -623,7 +624,7 @@ async function flushSave({ beacon = false } = {}) {
   clearTimeout(app.saveTimer);
   app.saveTimer = null;
 
-  if (!app.group || app.task === 0) return;   // 本地练习不保存
+  if (!app.group) return;
   const group = app.group;
   const cubes = app.cubes.map((c) => [...c]);
 

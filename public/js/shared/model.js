@@ -21,8 +21,8 @@ export const LIMITS = Object.freeze({ sizeX: 5, sizeY: 5, sizeZ: 5 });
  * 任务二 = 拿走木块（只会减少）
  * 任务三 = 添上木块（只会增加）
  *
- * 注意：任务0 只在学生端“练习模式”里本地使用，不写入服务器（见 app.js）；
- * 服务器正式的三个任务仍是 1/2/3。
+ * 注意：任务0（练习）在服务器用单独的一槽 "0" 保存，与正式任务 1/2/3 互不影响；
+ * 教师端在「练习模式」下按这槽显示，所以学生在任务0 的摆放老师也能看到。
  */
 export const TASKS = Object.freeze({
   0: { id: 0, name: '任务0', action: 'move', actionLabel: '移动木块', practice: true },

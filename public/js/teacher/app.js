@@ -5,7 +5,7 @@
 import { MiniStage } from './mini.js';
 import { CubeStage } from '../student/stage.js';
 import { ViewCards } from '../student/views.js';
-import { openStateStream, fetchState, saveGroup } from '../shared/net.js';
+import { openStateStream, fetchState, fetchSettings, saveGroup } from '../shared/net.js';
 import { sanitizeLoose, collapseColumns, taskInitial, taskMeta, normalizeTask, extraCells, missingCells } from '../shared/model.js';
 
 const GROUP_COUNT = 8;
@@ -52,6 +52,29 @@ let focusGuideTimer = null;
 const cards = new Map();
 
 let focus = null;   // { group, stage, views, task, cubes, mode, dirty, saving, lastEditAt, saveTimer }
+
+// 全局显示模式（与设置页一致）：training = 只看任务0（练习）；formal = 任务1·2·3。
+// 教师端也要跟着模式走，否则学生在练习任务0，教师屏幕还停在任务一。
+let viewMode = 'formal';
+let lastState = null;
+
+/** 某组当前应该展示的任务：练习模式统一显示任务0，正式模式看该组自己的任务号（0 视为 1） */
+function displayTask(g) {
+  if (viewMode === 'training') return 0;
+  const t = normalizeTask(g?.task);
+  return t >= 1 && t <= 3 ? t : 1;
+}
+
+/** 模式可能在其它标签页（设置页）里改，这里定期同步一次，改完不用手动刷新 */
+async function syncViewMode() {
+  try {
+    const s = await fetchSettings();
+    const next = s?.mode === 'training' ? 'training' : 'formal';
+    if (next === viewMode) return;
+    viewMode = next;
+    if (lastState) applyState(lastState);
+  } catch { /* 读不到设置就保持当前模式 */ }
+}
 
 // 调试入口：放大演示打开后，在 DevTools 敲 cubeView() 可查当前角度（与学生端同名同格式）
 window.cubeView = () => focus?.stage?.logView();
@@ -172,12 +195,14 @@ function updateSummary() {
 }
 
 function applyState(state) {
+  lastState = state;
   for (const g of state.groups) {
     const entry = cards.get(g.group);
     if (!entry) continue;
 
-    const task = normalizeTask(g.task);
+    const task = displayTask(g);
     const tasks = {
+      0: cloneCubes(g.tasks?.[0] ?? taskInitial(0)),
       1: cloneCubes(g.tasks?.[1] ?? taskInitial(1)),
       2: cloneCubes(g.tasks?.[2] ?? taskInitial(2)),
       3: cloneCubes(g.tasks?.[3] ?? taskInitial(3)),
@@ -365,7 +390,7 @@ function refreshFocus(state) {
   const g = state.groups.find((item) => item.group === focus.group);
   if (!g) return;
 
-  const task = normalizeTask(g.task);
+  const task = displayTask(g);
   const cubes = cloneCubes(g.tasks?.[task] ?? taskInitial(task));
 
   // 老师刚改过（还没保存完）时，不要被服务器回声覆盖
@@ -416,6 +441,12 @@ async function boot() {
   buildBoard();
   setStatus('loading', '连接中…');
 
+  // 先读全局显示模式，第一屏就能直接显示正确的任务（任务0 / 任务1·2·3）
+  try {
+    const s = await fetchSettings();
+    if (s?.mode === 'training') viewMode = 'training';
+  } catch { /* 读不到就按正式模式 */ }
+
   try {
     applyState(await fetchState());
   } catch {
@@ -433,6 +464,7 @@ async function boot() {
   });
 
   setInterval(refreshTimes, 5000);
+  setInterval(syncViewMode, 4000);
 }
 
 boot();
