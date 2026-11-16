@@ -26,6 +26,12 @@ const edgeGeo = new THREE.EdgesGeometry(geo);
 const matCube = new THREE.MeshLambertMaterial({ color: 0xf7efa0, ...CUBE_FACE });
 // 学生新添的积木（任务三）在教师端也显示粉色
 const matPink = new THREE.MeshLambertMaterial({ color: 0xeec0d1, ...CUBE_FACE });
+// 「原来位置」淡虚线框（任务一移动后 / 任务二拿走后的原格）
+const traceGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
+const matTrace = new THREE.LineDashedMaterial({
+  color: 0xb08a5a, dashSize: 0.16, gapSize: 0.12,
+  transparent: true, opacity: 0.55, depthWrite: false,
+});
 const matEdge = makeEdgeMaterial();
 const baseGeo = new THREE.PlaneGeometry(LIMITS.sizeX, LIMITS.sizeZ);
 // 地面同样往后推深度，方块贴地的底边才不会被地面挡掉
@@ -71,6 +77,10 @@ export class MiniStage {
 
     this.group = new THREE.Group();
     scene.add(this.group);
+
+    // 「原来位置」的淡虚线框，和学生端一致
+    this.traceGroup = new THREE.Group();
+    scene.add(this.traceGroup);
 
     this.cubes = [];
     this.needsRender = true;
@@ -229,7 +239,7 @@ export class MiniStage {
     }
   };
 
-  setCubes(cubes, colored = []) {
+  setCubes(cubes, colored = [], trace = []) {
     this.cubes = cubes;
     const pinkKeys = new Set((colored ?? []).map((c) => c.join(',')));
     this.group.clear();
@@ -240,6 +250,15 @@ export class MiniStage {
       outline.renderOrder = EDGE_RENDER_ORDER;
       mesh.add(outline);
       this.group.add(mesh);
+    }
+    // 「原来位置」淡虚线框
+    this.traceGroup.clear();
+    for (const [x, y, z] of (trace ?? [])) {
+      const line = new THREE.LineSegments(traceGeo, matTrace);
+      line.computeLineDistances();
+      line.position.set(x - OFF_X, y + 0.5, z - OFF_Z);
+      line.renderOrder = EDGE_RENDER_ORDER;
+      this.traceGroup.add(line);
     }
     this.needsRender = true;
     if (this.interactive) {
