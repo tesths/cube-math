@@ -28,15 +28,15 @@
 <script type="importmap">
 {
   "imports": {
-    "three": "/vendor/three.module.js",
-    "three/addons/": "/vendor/addons/"
+    "three": "https://registry.npmmirror.com/three/0.186.1/files/build/three.module.js",
+    "three/addons/": "https://registry.npmmirror.com/three/0.186.1/files/examples/jsm/"
   }
 }
 </script>
 <!-- 关键模块预加载：并行下载，消除 import 串行瀑布（高延迟/低带宽网络下收益很大） -->
-<link rel="modulepreload" href="/vendor/three.module.js">
-<link rel="modulepreload" href="/vendor/three.core.js">
-<link rel="modulepreload" href="/vendor/addons/controls/OrbitControls.js">
+<link rel="modulepreload" href="https://registry.npmmirror.com/three/0.186.1/files/build/three.module.js" crossorigin>
+<link rel="modulepreload" href="https://registry.npmmirror.com/three/0.186.1/files/build/three.core.js" crossorigin>
+<link rel="modulepreload" href="https://registry.npmmirror.com/three/0.186.1/files/examples/jsm/controls/OrbitControls.js" crossorigin>
 <link rel="modulepreload" href="/js/shared/view.js">
 <link rel="modulepreload" href="/js/shared/model.js">
 <link rel="modulepreload" href="/js/shared/net.js">

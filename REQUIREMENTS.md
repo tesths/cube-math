@@ -245,3 +245,12 @@
 - 纯视觉提示：`stage.setTraceCells(cells)` 只画线框，**不参与三视图计算**，也不挡点击（`raycast` 空实现）；重置/切任务/进组时清空。
 
 - 教师端同步：8 宫格卡片与「放大演示」也显示学生的**粉色积木**和**原位置淡虚线**（`mini.js` 的 `setCubes(cubes, colored, trace)`；放大演示用 `CubeStage.setTraceCells`）。教师端同样是只读视觉，不影响三视图。
+
+## 13. 静态资源性能
+
+- 排查发现：冷启动慢的主因是**从中国大陆直连 Vercel(香港)带宽/时延很差**（百度 TTFB ~0.15s，本站 1.8–2.5s；`three.core.js` 288KB 常要 9–33s）。
+- 已做：
+  1. `index/teacher` 给所有关键 ES 模块加 `modulepreload`，把三波 import 串行改成一波并行；
+  2. `/vendor/*` 设 `Cache-Control: public, max-age=31536000, immutable`，重复访问不再下载 three（实测同标签刷新 Load≈0.76s）；
+  3. **three 与 addons 改从 npmmirror（阿里，国内）加载**（importmap 指向 `registry.npmmirror.com/three/0.186.1/files/...`，支持 CORS、1 年缓存）。实测 three 下载从 3–33s 降到 0.2–0.36s。
+- 回退：把 `index.html / teacher.html` 的 importmap 改回 `"three": "/vendor/three.module.js"`、`"three/addons/": "/vendor/addons/"` 即可（vendor 文件仍保留）。
