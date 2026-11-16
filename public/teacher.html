@@ -16,6 +16,18 @@
   }
 }
 </script>
+<!-- 关键模块预加载：并行下载，消除 import 串行瀑布 -->
+<link rel="modulepreload" href="/vendor/three.module.js">
+<link rel="modulepreload" href="/vendor/three.core.js">
+<link rel="modulepreload" href="/vendor/addons/controls/OrbitControls.js">
+<link rel="modulepreload" href="/js/shared/view.js">
+<link rel="modulepreload" href="/js/shared/model.js">
+<link rel="modulepreload" href="/js/shared/net.js">
+<link rel="modulepreload" href="/js/student/camera-fit.js">
+<link rel="modulepreload" href="/js/student/stage.js">
+<link rel="modulepreload" href="/js/student/views.js">
+<link rel="modulepreload" href="/js/teacher/mini.js">
+<link rel="modulepreload" href="/js/teacher/app.js">
 </head>
 <body>
 <header class="topbar">
