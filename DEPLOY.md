@@ -1,7 +1,7 @@
 # 部署指南 · cube-views（正方体三视图教具）
 
 > 本文写给「不是专业运维」的老师：照着一步步点，就能把网站放到公网上，
-> 学生用手机/平板扫码打开，老师在自己电脑上看 8 个组同步。
+> 学生用手机/平板扫码打开，老师在自己电脑上看 10 个组同步。
 >
 > 仓库里已经准备好的东西：`vercel.json`（静态站点 + 无服务器函数）、`api/`（接口）、
 > `lib/store.js`（存储）、`Dockerfile` + `railway.json`（Railway）、`public/`（纯静态前端）。
@@ -66,11 +66,11 @@ Vercel 从 Git 仓库自动部署，所以代码得先在 GitHub 上。
    | Environment Variables | 先跳过，下一步配 Redis 后会自动注入；也可以现在手填（见 1.4） |
 
 4. 如果先点了 **Deploy** 也没关系：这一步会先跑起来，只是**还没配 Redis**，
-   多个函数实例之间不同步（页面能开，但 8 个组互相看不到）。配完 Redis 重新部署即可。
+   多个函数实例之间不同步（页面能开，但 10 个组互相看不到）。配完 Redis 重新部署即可。
 
 ### 1.3 一键安装 Upstash Redis（Vercel Marketplace）
 
-Vercel 没有可写磁盘、函数实例之间也不共享内存，所以 8 个组要互相同步，**必须有 Redis**。
+Vercel 没有可写磁盘、函数实例之间也不共享内存，所以 10 个组要互相同步，**必须有 Redis**。
 最省事的方式是从 Vercel 的 Marketplace 装：会自动把连接信息注入成环境变量。
 
 1. 项目页 → 顶部 **Storage** 标签 → **Create Database** → 选 **Upstash**（Marketplace）。
@@ -111,14 +111,14 @@ Vercel 没有可写磁盘、函数实例之间也不共享内存，所以 8 个�
 把 `<你的域名>` 换成 Vercel 给的地址，例如 `https://cube-views-xxx.vercel.app`。
 用手机和电脑各开一个，效果更真实。
 
-1. **首页**：打开 `https://<你的域名>/` → 先出现「你是第几组？」的选组页（8 个大按钮）。
+1. **首页**：打开 `https://<你的域名>/` → 先出现「你是第几组？」的选组页（10 个大按钮）。
    点一个组号 → 进入工作区（左工具 / 中间方格纸 / 右侧「看三视图」），不白屏。
    选完就锁定在这一组，刷新不会回到首页；换组见文末「清空/重置」一节。
-2. **教师端**：打开 `https://<你的域名>/teacher` → 8 个小组的卡片面板。
+2. **教师端**：打开 `https://<你的域名>/teacher` → 10 个小组的卡片面板。
 3. **接口 1**：打开 `https://<你的域名>/api/state` → 一段 JSON，包含
-   `"groupCount": 8` 和 `"groups": [...]`。
+   `"groupCount": 10` 和 `"groups": [...]`。
 4. **接口 2（健康检查）**：打开 `https://<你的域名>/api/healthz` →
-   `{"ok":true,"groups":8,"region":"hkg1",...}`。
+   `{"ok":true,"groups":10,"region":"hkg1",...}`。
    `region` 是 `hkg1` 就说明函数真的跑在香港。
 5. **接口 3（SSE 降级）**：命令行执行
 
@@ -154,7 +154,7 @@ Vercel 没有可写磁盘、函数实例之间也不共享内存，所以 8 个�
      `curl -X POST https://<你的域名>/api/groups/3/clear`（或学生端点两次「全部清空」）；
    - 两个设备都断网再恢复 → 页面自己会重连/继续轮询，不用刷新。
 9. **数据真持久**：在 Upstash 控制台 → 你的数据库 → **Data Browser**，
-   能看到 `cube-views:g1` … `cube-views:g8` 的键；然后 Vercel **Redeploy** 一次，
+   能看到 `cube-views:g1` … `cube-views:g10` 的键；然后 Vercel **Redeploy** 一次，
    刷新教师端，刚才摆的图形还在（因为在 Redis 里，不在函数内存里）。
 
 ### 1.6 区域：`hkg1` 与各套餐的差别
@@ -200,14 +200,14 @@ Vercel 没有可写磁盘、函数实例之间也不共享内存，所以 8 个�
 先说结论：**一个班、每周几节课，免费额度基本够；如果每周课很多，Upstash 的
 按量付费很便宜，可以先免费、不够再升。**
 
-课堂量级估算（8 个学生端 + 1 个教师端，降级轮询每 2 秒一次）：
+课堂量级估算（10 个学生端 + 1 个教师端，降级轮询每 2 秒一次）：
 
 | 指标 | 估算 | 免费额度 | 结论 |
 |---|---|---|---|
 | 函数调用 | ≈ 4.5 次/秒 → 45 分钟一课约 **1.2 万次** | Vercel Hobby **100 万次/月** | ≈ 80 节课/月 |
 | 流量 | 每次响应几 KB，一课约 **20 MB** | Vercel Hobby **100 GB/月** | 绰绰有余 |
-| Redis 命令 | 每台设备每 2 秒 1 条 `MGET`（一次查询取回 8 个组） → 一课约 **1.2 万条** | Upstash 免费版 **50 万条/月** | ≈ 40 节课/月 |
-| Redis 存储 | 8 个键，每个最多几百字节 | 免费版 250 MB | 4 个数量级的余量 |
+| Redis 命令 | 每台设备每 2 秒 1 条 `MGET`（一次查询取回 10 个组） → 一课约 **1.2 万条** | Upstash 免费版 **50 万条/月** | ≈ 40 节课/月 |
+| Redis 存储 | 10 个键，每个最多几百字节 | 免费版 250 MB | 4 个数量级的余量 |
 
 - 超过 Upstash 免费额度后：把数据库切到 **Pay-As-You-Go**（$0.20 / 10 万条命令），
   一课大约 **2 分钱**；记得在 Upstash 控制台设 **Monthly Budget**，到达上限只会限流不会乱扣钱。
@@ -256,7 +256,7 @@ Vercel 没有可写磁盘、函数实例之间也不共享内存，所以 8 个�
 4. 环境变量：通常什么都不用填（`PORT` 由 Railway 自动注入）。
    如果前端在别的域名上，建议加 `CORS_ORIGIN=https://<前端域名>`。
 5. **Settings → Networking → Generate Domain** 生成公网地址。
-6. 验证：`https://<railway域名>/healthz` 返回 `{"ok":true,"groups":8}`；
+6. 验证：`https://<railway域名>/healthz` 返回 `{"ok":true,"groups":10}`；
    `/teacher` 能打开；两台设备同步是**秒级**（有 SSE，不轮询）。
 7. 区域：Railway 可选的亚洲区主要是 **Singapore**，从国内访问会比香港慢一些——
    这正是当初改用 Vercel 的原因。如果又想要实时又想要香港，需要自己找香港 VPS（见下面的兜底方案）。
@@ -309,7 +309,7 @@ Vercel 会重新部署；环境变量改动一律记得 **Redeploy**。
 
 ## 清空数据（换班级 / 开学重置）
 
-线上数据存在 Redis 的 `cube-views:g1` … `cube-views:g8` 这 8 个键里。
+线上数据存在 Redis 的 `cube-views:g1` … `cube-views:g10` 这 10 个键里。
 
 **方式 A：用网站接口（最安全，不用碰 Redis）**
 
@@ -324,7 +324,7 @@ done
 
 **方式 B：Upstash 控制台（最直观）**
 
-Upstash Console → 你的数据库 → **Data Browser** → 逐个选中 `cube-views:g1`…`g8` → **Delete**。
+Upstash Console → 你的数据库 → **Data Browser** → 逐个选中 `cube-views:g1`…`g10` → **Delete**。
 
 **方式 C：Upstash REST API（命令行）**
 

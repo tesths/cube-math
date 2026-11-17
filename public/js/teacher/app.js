@@ -1,5 +1,5 @@
 /**
- * 教师端：一屏看 8 个小组，点某一个组可以放大演示（界面与学生端一致，方便投大屏讲课）。
+ * 教师端：一屏看 10 个小组，点某一个组可以放大演示（界面与学生端一致，方便投大屏讲课）。
  * 数据来自 SSE 推送（无服务器环境自动降级为轮询），学生一改，这里秒级同步。
  */
 import { MiniStage } from './mini.js';
@@ -8,7 +8,7 @@ import { ViewCards } from '../student/views.js';
 import { openStateStream, fetchState, fetchSettings, saveGroup } from '../shared/net.js';
 import { sanitizeLoose, collapseColumns, taskInitial, taskMeta, normalizeTask, extraCells, missingCells } from '../shared/model.js';
 
-const GROUP_COUNT = 8;
+const GROUP_COUNT = 10;
 const $ = (id) => document.getElementById(id);
 
 const els = {
@@ -281,7 +281,7 @@ function openFocus(group) {
   els.focusMeta.textContent = `${taskMeta(focus.task).name} · ${describe(focus.cubes)}`;
   els.focusLayer.hidden = false;
   document.body.classList.add('is-focusing');
-  els.board.setAttribute('inert', '');      // 背后的 8 宫格暂时不可点、不可 Tab 进去
+  els.board.setAttribute('inert', '');      // 背后的 10 宫格暂时不可点、不可 Tab 进去
 
   // 布局完成后再测量尺寸，否则 canvas 会拿不到宽高
   requestAnimationFrame(() => {

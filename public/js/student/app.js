@@ -9,7 +9,7 @@ import { ViewPanel } from './views.js';
 import { sanitizeLoose, collapseColumns, taskInitial, taskMeta, normalizeTask, extraCells, missingCells } from '../shared/model.js';
 import { openStateStream, saveGroup, saveGroupBeacon, fetchState, fetchSettings } from '../shared/net.js';
 
-const GROUP_COUNT = 8;
+const GROUP_COUNT = 10;
 const LS_KEY = 'cube-views:group';
 const LS_MODE = 'cube-views:mode';        // 'training'(只显示任务0) | 'formal'(任务1·2·3)
 const LS_TASK0 = 'cube-views:task0';      // 任务0（练习）的本机兜底进度；同时同步到服务器单独槽 0

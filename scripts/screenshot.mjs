@@ -1,7 +1,7 @@
 /**
  * 浏览器端到端验证：截图 + 真交互断言（不是人工点检）。
  * 运行：node scripts/screenshot.mjs
- * 跑完会把 8 个组恢复成任务一的初始摆放（每个组 6 块）。
+ * 跑完会把 10 个组恢复成任务一的初始摆放（每个组 6 块）。
  */
 import path from 'node:path';
 import fs from 'node:fs/promises';
@@ -85,6 +85,7 @@ const T3 = [[1, 0, 3], [1, 0, 2], [2, 0, 2], [2, 1, 2]];
 const SEED = [
   [1, T1, 1], [2, T1, 1], [3, T1, 1], [4, T1, 2],
   [5, T3, 3], [6, T1, 1], [7, T1, 2], [8, T3, 3],
+  [9, T1, 1], [10, T3, 3],
 ];
 for (const [group, cubes, task] of SEED) {
   // 三个任务槽都重置，避免上一轮跑测试留下的进度影响这一轮
@@ -295,6 +296,9 @@ if (!(await student.locator('.views-grid').isHidden())) errors.push('[三视图]
 const teacher = await newPage();
 await teacher.goto(`${BASE}/teacher`, { waitUntil: 'load' });
 await teacher.waitForTimeout(1500);
+const teacherCards = await teacher.locator('.group-card').count();
+console.log(`教师端组卡片数：${teacherCards}`);
+if (teacherCards !== 10) errors.push(`[教师端] 组卡片数量应为 10，实际 ${teacherCards}`);
 await shot(teacher, 'teacher-desktop');
 
 // 方块数量不变，移动不改变文案，所以比较教师端卡片画面
@@ -451,7 +455,7 @@ await shot(gate, 'home-desktop');
 
 const gateCount = await gate.locator('#groupGrid button').count();
 console.log(`  首页组按钮数：${gateCount}`);
-if (gateCount !== 8) errors.push(`[首页] 组按钮数量应为 8，实际 ${gateCount}`);
+if (gateCount !== 10) errors.push(`[首页] 组按钮数量应为 10，实际 ${gateCount}`);
 
 // 首页上不能有任何"换组"入口
 const switchCount = await gate.locator('#switchGroup').count();
@@ -759,13 +763,13 @@ await mv.close();
 // ---------------------------------------------------------------- 收尾
 const T1_CLEAN = [[1, 0, 3], [1, 0, 2], [2, 0, 2], [3, 0, 2], [2, 0, 1], [1, 1, 2]];
 const T3_CLEAN = [[1, 0, 3], [1, 0, 2], [2, 0, 2], [2, 1, 2]];
-for (let i = 1; i <= 8; i++) {
+for (let i = 1; i <= 10; i++) {
   await post(i, T1_CLEAN, 1);
   await post(i, T1_CLEAN, 2);
   await post(i, T3_CLEAN, 3);
   await post(i, T1_CLEAN, 1);
 }
-console.log(`\n已恢复每个组为任务一初始：${(await Promise.all([1, 2, 3, 4, 5, 6, 7, 8].map((i) => stateOf(i)))).map((c) => c.length).join('/')}`);
+console.log(`\n已恢复每个组为任务一初始：${(await Promise.all([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => stateOf(i)))).map((c) => c.length).join('/')}`);
 
 await browser2.close();
 await desktop2.close();

@@ -2,7 +2,7 @@
  * 教师端的只读 3D 视图。
  *
  * 两种用法：
- *   new MiniStage(canvas)                    —— 8 宫格里的小卡片：固定等轴测视角，只渲染一帧
+ *   new MiniStage(canvas)                    —— 10 宫格里的小卡片：固定等轴测视角，只渲染一帧
  *   new MiniStage(canvas, { interactive: true }) —— 放大演示：可以用视角球/鼠标右键转视角
  *
  * 几何与材质在所有实例之间共享，8 个卡片也只占很少显存。
@@ -289,7 +289,7 @@ export class MiniStage {
   }
 
   /** 8 张小卡片：与学生端 / 放大演示完全相同的起始角度（俯仰 80°、方位 10°）和上移量。
-   *  取景高度固定，8 张卡片比例一致，方便横向比较。 */
+   *  取景高度固定，10 张卡片比例一致，方便横向比较。 */
   _placeStatic() {
     const top = MIN_FIT_TOP;
     const center = frameCenter(top);

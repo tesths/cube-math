@@ -32,7 +32,7 @@ const stats = { state200: 0, state304: 0, events204: 0 };
 
 const mkTasks = () => ({ 1: taskInitial(1), 2: taskInitial(2), 3: taskInitial(3) });
 const mkGroup = (i) => ({ group: i + 1, task: 1, tasks: mkTasks(), updatedAt: 0 });
-let groups = Array.from({ length: 8 }, (_, i) => mkGroup(i));
+let groups = Array.from({ length: 10 }, (_, i) => mkGroup(i));
 
 // 把格子坐标换算成页面坐标（与 stage.js 的取景规则一致）
 const FOV = 38;
@@ -57,7 +57,7 @@ function stateBody() {
   return {
     serverTime: Date.now(),
     limits: { sizeX: 5, sizeY: 5, sizeZ: 5 },
-    groupCount: 8,
+    groupCount: 10,
     groups,
   };
 }
@@ -249,7 +249,7 @@ if (stats.state200 < 1) errors.push('[304] 一次完整响应都没有');
 console.log('\n场景二：SSE 连上了但不推数据（应当自动降级为轮询）');
 
 let hangRequests = { state: 0, events: 0 };
-const hangGroups = Array.from({ length: 8 }, (_, i) => mkGroup(i));
+const hangGroups = Array.from({ length: 10 }, (_, i) => mkGroup(i));
 const hangServer = http.createServer(async (req, res) => {
   const url = new URL(req.url, BASE);
   if (req.method === 'OPTIONS') {
@@ -276,7 +276,7 @@ const hangServer = http.createServer(async (req, res) => {
   }
   if (url.pathname === '/api/state') {
     hangRequests.state += 1;
-    const body = JSON.stringify({ serverTime: Date.now(), limits: { sizeX: 5, sizeY: 5, sizeZ: 5 }, groupCount: 8, groups: hangGroups });
+    const body = JSON.stringify({ serverTime: Date.now(), limits: { sizeX: 5, sizeY: 5, sizeZ: 5 }, groupCount: 10, groups: hangGroups });
     res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'no-store', ...CORS });
     return res.end(body);
   }

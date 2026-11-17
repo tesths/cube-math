@@ -37,13 +37,15 @@ await check('文件存储：写入后落盘，重启能读回来', async () => {
   const store = new FileStore(tmpDir);
   await store.init();
   await store.setGroup(3, [[0, 0, 0], [1, 0, 0]]);
+  await store.setGroup(10, [[2, 0, 2]]);
   await store.flush();
 
   const again = new FileStore(tmpDir);
   await again.init();
   const groups = await again.getAll();
-  assert.equal(groups.length, 8, '永远返回 8 个组');
+  assert.equal(groups.length, 10, '永远返回 10 个组');
   assert.deepEqual(groups[2].tasks[1], [[0, 0, 0], [1, 0, 0]]);
+  assert.deepEqual(groups[9].tasks[1], [[2, 0, 2]], '第 10 组能读回自己那一槽');
   assert.ok(groups[2].updatedAt > 0);
 });
 
@@ -55,7 +57,7 @@ await check('文件存储：坏数据不会拖垮启动', async () => {
   const store = new FileStore(dir);
   await store.init();
   const groups = await store.getAll();
-  assert.equal(groups.length, 8);
+  assert.equal(groups.length, 10);
   // 坏数据时按"默认 3 个方块"启动（这一版没有空组）
   assert.ok(groups.every((g) => g.tasks[1].length === 6));   // 任务一的初始摆放是 6 块
 });
@@ -72,9 +74,9 @@ await check('无服务器分支：没有 Redis 时退化为内存存储且可用
   const res = await applyGroup(1, { cubes: [[0, 0, 0], [0, 1, 0]] });
   assert.equal(res.ok, true);
   const state = await snapshot();
-  assert.equal(state.groups.length, 8);
+  assert.equal(state.groups.length, 10);
   assert.equal(state.groups[0].tasks[1].length, 2);
-  assert.equal(state.groupCount, 8);
+  assert.equal(state.groupCount, 10);
 });
 
 await check('无服务器分支：缺 cubes 字段返回 400（不能当成清空）', async () => {
@@ -89,8 +91,16 @@ await check('无服务器分支：越界坐标返回 400', async () => {
   assert.equal(res.status, 400);
 });
 
+await check('无服务器分支：第 10 组可用（边界组号不越界）', async () => {
+  const res = await applyGroup(10, { cubes: [[0, 0, 0], [0, 1, 0]] });
+  assert.equal(res.ok, true);
+  const state = await snapshot();
+  assert.equal(state.groups[9].group, 10);
+  assert.equal(state.groups[9].tasks[1].length, 2);
+});
+
 await check('无服务器分支：不存在的组返回 404', async () => {
-  const res = await applyGroup(9, { cubes: [] });
+  const res = await applyGroup(11, { cubes: [] });
   assert.equal(res.ok, false);
   assert.equal(res.status, 404);
 });

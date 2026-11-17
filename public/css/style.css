@@ -306,7 +306,7 @@ html.has-group .gate { display: none; }
 
 .gate-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
 }
 
@@ -680,7 +680,7 @@ html.has-group .gate { display: none; }
 .teacher-board {
   padding: 14px;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   grid-auto-rows: minmax(0, 1fr);
   gap: 12px;
   height: calc(100vh - var(--topbar-h));

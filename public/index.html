@@ -12,15 +12,15 @@
   // 首屏防闪：已经选过组就直接显示工作区，避免先闪一下选组页
   try {
     var reset = /[?&]reset\b/.test(location.search);
-    var fromUrl = /[?&]group=([1-8])\b/.exec(location.search);
+    var fromUrl = /[?&]group=(10|[1-9])\b/.exec(location.search);
     var bound = Number(localStorage.getItem('cube-views:group'));
     // 不管什么任务（含任务0 练习），都先选组：地址栏带 ?group= 或本机已绑定才直接进工作区
-    if (!reset && (fromUrl || (bound >= 1 && bound <= 8))) {
+    if (!reset && (fromUrl || (bound >= 1 && bound <= 10))) {
       document.documentElement.classList.add('has-group');
     }
   } catch (e) {
     // 隐私模式下 localStorage 不可用：地址栏里有 ?group= 就照常进工作区
-    if (/[?&]group=([1-8])\b/.test(location.search) && !/[?&]reset\b/.test(location.search)) {
+    if (/[?&]group=(10|[1-9])\b/.test(location.search) && !/[?&]reset\b/.test(location.search)) {
       document.documentElement.classList.add('has-group');
     }
   }
@@ -50,8 +50,8 @@
               点中的积木变橙 #f97316；
               等宽字体只留给真实数据（格数、块数、时间）；方块＝单色实体 + 深色描边。
   STORY       进门先认领自己的组（认领后锁定）→ 拖方块搭形状 → 点一下看三视图 →
-              发现和想象不一样，回去改。老师一屏扫完 8 个组，点某组可放大讲课。
-  FIRST VIEWPORT  未认领时是首页：一句"你是第几组"+ 8 个大按钮。
+              发现和想象不一样，回去改。老师一屏扫完 10 个组，点某组可放大讲课。
+  FIRST VIEWPORT  未认领时是首页：一句"你是第几组"+ 10 个大按钮。
               认领后是工作区：顶栏（组号 / 保存状态）＋ 左侧三个工具 ＋ 中间 3D 舞台 ＋ 右侧三视图。
   FORM        操作型界面（Operate），走"技术制图"这一支；概念种子脚本依赖线上目录，
               本机不可达（两次运行均无输出，已披露），方向由 PRODUCT.md 的事实直接定。
@@ -62,7 +62,7 @@
 <div class="gate" id="gate">
   <div class="gate-inner">
     <h1>你是第几组？</h1>
-    <p class="lede">点一下自己的组号就能开始摆放正方体，不用账号也不用密码。老师会在他的屏幕上一眼看到 8 个组的进展。</p>
+    <p class="lede">点一下自己的组号就能开始摆放正方体，不用账号也不用密码。老师会在他的屏幕上一眼看到 10 个组的进展。</p>
     <div class="gate-grid" id="groupGrid"></div>
     <p class="gate-note">选好之后这台电脑就固定在这一组，不能再改。选错了请找老师。</p>
   </div>

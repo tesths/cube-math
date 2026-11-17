@@ -64,24 +64,24 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 try {
   // ---------- 0. 服务健康
   const h = await api('/api/healthz');
-  check('服务健康 /api/healthz', h.status === 200 && h.body?.ok === true && h.body?.groups === 8, JSON.stringify(h.body));
+  check('服务健康 /api/healthz', h.status === 200 && h.body?.ok === true && h.body?.groups === 10, JSON.stringify(h.body));
   check('存储是 Redis（多实例共享）', h.body?.store === 'redis', `store=${h.body?.store}`);
   check('函数区域 hkg1', h.body?.region === 'hkg1', `region=${h.body?.region}`);
 
   // 准备干净数据：三个任务槽都恢复初始
-  for (let i = 1; i <= 8; i++) {
+  for (let i = 1; i <= 10; i++) {
     await postGroup(i, T1, 1);
     await postGroup(i, T1, 2);
     await postGroup(i, T3, 3);
   }
   // 再把"当前任务"置回任务一，模拟每组刚打开的状态
-  for (let i = 1; i <= 8; i++) await postGroup(i, T1, 1);
+  for (let i = 1; i <= 10; i++) await postGroup(i, T1, 1);
 
   // ---------- 1. 首页
   await page.goto(`${BASE}/?reset`, { waitUntil: 'load', timeout: 60000 });
   await page.waitForTimeout(2600);
   check('首页显示选组', await page.locator('#gate').isVisible());
-  check('首页 8 个组按钮', (await page.locator('#groupGrid button').count()) === 8);
+  check('首页 10 个组按钮', (await page.locator('#groupGrid button').count()) === 10);
   check('首页有教师端入口', (await page.locator('#gate a[href="/teacher"]').count()) === 1);
   check('未进组时不显示任务栏', !(await page.locator('.task-bar').isVisible()));
 
@@ -223,9 +223,9 @@ try {
   teacher.on('console', (m) => { if (m.type() === 'error') terr.push(m.text()); });
   await teacher.goto(`${BASE}/teacher`, { waitUntil: 'load', timeout: 60000 });
   await teacher.waitForTimeout(2500);
-  check('教师端 8 个组卡片', (await teacher.locator('.group-card').count()) === 8);
+  check('教师端 10 个组卡片', (await teacher.locator('.group-card').count()) === 10);
   const tags = await teacher.locator('.group-card .task-tag').allTextContents();
-  check('教师端每组都显示任务标签', tags.length === 8 && tags.every((t) => /任务[一二三]/.test(t)), tags.join('/'));
+  check('教师端每组都显示任务标签', tags.length === 10 && tags.every((t) => /任务[一二三]/.test(t)), tags.join('/'));
   // 学生移动 → 教师端卡片变化（用固定数据，避免受前面步骤影响）
   await postGroup(3, T1, 1);
   await page.reload({ waitUntil: 'load' });
@@ -320,7 +320,7 @@ try {
 } finally {
   await browser.close();
   // 恢复干净数据
-  for (let i = 1; i <= 8; i++) {
+  for (let i = 1; i <= 10; i++) {
     await postGroup(i, T1, 1).catch(() => {});
     await postGroup(i, T1, 2).catch(() => {});
     await postGroup(i, T3, 3).catch(() => {});

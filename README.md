@@ -1,10 +1,10 @@
 # 正方体三视图 · 课堂教具（cube-math）
 
 学生在 5×5 的格子上摆正方体，点一下就能看到**从前面看 / 从右面看 / 从上面看**的方格图；
-老师在另一台设备上**一屏同时看到 8 个小组**，还能放大某一组直接演示、修改。
+老师在另一台设备上**一屏同时看到 10 个小组**，还能放大某一组直接演示、修改。
 
 - 三个课堂任务：**任务一 移动 / 任务二 拿走 / 任务三 添上**；任务一/二共用同一初始图形，任务三图形不同，三个任务的进度各自保存。
-- 学生端不用账号密码，点组号就进；教师端 8 宫格实时同步（局域网 SSE 秒级，Vercel 轮询 2 秒）。
+- 学生端不用账号密码，点组号就进；教师端 10 宫格实时同步（局域网 SSE 秒级，Vercel 轮询 2 秒）。
 - 黄色木块 + 细黑边，点中的变粉；三视图同款配色。平板 / 一体机 / 大屏都做了触屏适配。
 - **零运行时依赖**：服务器只用 Node 内置模块，three.js 已放在 [public/vendor/](public/vendor/)，断网也能开。
 
@@ -13,7 +13,7 @@
 
 ![学生端：3D 摆放 + 三视图](docs/images/student.jpg)
 
-![教师端：8 个小组一屏](docs/images/teacher.jpg)
+![教师端：10 个小组一屏](docs/images/teacher.jpg)
 
 ![教师端放大演示：带工具栏，可以直接改](docs/images/teacher-focus.jpg)
 
@@ -65,7 +65,7 @@ npm start                   # 启动本地服务器
 
 ### 学生端
 
-1. 首页点自己的组号（第 1~8 组）。选好后地址栏带上 `?group=N`，刷新、重开浏览器还是这一组；界面里**没有"换组"入口**，避免误点别人的组。
+1. 首页点自己的组号（第 1~10 组）。选好后地址栏带上 `?group=N`，刷新、重开浏览器还是这一组；界面里**没有"换组"入口**，避免误点别人的组。
 2. 老师换组：把地址栏改成 `?group=6` 回车即可；`?reset` 回首页；`/?reset&group=5` 一步换组。
 3. 顶栏下面单独一行是**任务一 / 任务二 / 任务三**，点一下切换，默认打开是**任务一**。
 4. 左侧只有一个**动作按钮**（文案随任务变：移动 / 拿走 / 添上）和**重置**：
@@ -81,8 +81,8 @@ npm start                   # 启动本地服务器
 
 ### 教师端
 
-- `/teacher`：4 列 × 2 行 8 张卡片，显示组号、任务标签、块数 / 层数、最后改动时间；学生改完会自动更新。
-- 点 **放大**：全屏演示，左边大 3D + 工具栏，右边三视图；老师**可以直接在学生作品上改**，改完自动保存回这一组，学生端 1~3 秒内跟着变；`Esc` 或"返回 8 个组"退出。
+- `/teacher`：5 列 × 2 行 10 张卡片，显示组号、任务标签、块数 / 层数、最后改动时间；学生改完会自动更新。
+- 点 **放大**：全屏演示，左边大 3D + 工具栏，右边三视图；老师**可以直接在学生作品上改**，改完自动保存回这一组，学生端 1~3 秒内跟着变；`Esc` 或"返回 10 个组"退出。
 
 ---
 
@@ -166,7 +166,7 @@ npm start                   # 启动本地服务器
 | 环境 | 实现 | 说明 |
 |---|---|---|
 | 本地 / Railway | `FileStore` | 写 `data/state.json`，原子落盘，重启不丢 |
-| Vercel / 配了 Redis | `RedisStore` | 每组一个键 `cube-views:g1..g8`，`MGET` / `SET`；超时会自动降级并 warn |
+| Vercel / 配了 Redis | `RedisStore` | 每组一个键 `cube-views:g1..g10`，`MGET` / `SET`；超时会自动降级并 warn |
 | 兜底 | `MemoryStore` | 进程内存，重启即丢（**只适合看界面，不适合上课**） |
 
 ### 同步链路
@@ -185,9 +185,9 @@ npm start                   # 启动本地服务器
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/state` | 8 个组的状态（含 `tasks`），支持 `ETag` / 304 |
+| GET | `/api/state` | 10 个组的状态（含 `tasks`），支持 `ETag` / 304 |
 | GET | `/api/events` | SSE 事件流；Vercel 上返回 204 |
-| GET | `/api/healthz` | `{ok, groups:8, region, store, time}`；`store` 应为 `redis`（Vercel）或 `file` |
+| GET | `/api/healthz` | `{ok, groups:10, region, store, time}`；`store` 应为 `redis`（Vercel）或 `file` |
 | POST | `/api/groups/:group` | 提交某组当前任务，body：`{"cubes":[[x,y,z],...],"task":1}` |
 | POST | `/api/groups/:group/clear` | 清空该组当前任务 |
 
@@ -209,7 +209,7 @@ npm run vendor              # 从 node_modules/three 重新拷贝 three.js 到 p
 
 注意事项：
 
-- `verify:e2e` 需要**本地服务已启动**（`npm start`），跑完会把 8 个组恢复成任务一初始状态；**上课期间别跑**。
+- `verify:e2e` 需要**本地服务已启动**（`npm start`），跑完会把 10 个组恢复成任务一初始状态；**上课期间别跑**。
 - `verify:prod` 会临时改动线上数据，结束时自动恢复；可用 `AUDIT_BASE=http://localhost:5173 npm run verify:prod` 指向本地。
 - 浏览器测试用 [scripts/browser.mjs](scripts/browser.mjs) 自动找浏览器，顺序是：`CHROME_PATH` → `PLAYWRIGHT_BROWSERS_PATH` 里的 Playwright 浏览器 → 系统 Chrome/Chromium。
   新电脑如果没有浏览器，任选一种：
@@ -252,7 +252,7 @@ npm run vendor              # 从 node_modules/three 重新拷贝 three.js 到 p
    ```
 
 5. 自定义域名 `cube.dididigu.com` 已在 Cloudflare 用 CNAME 指向 Vercel；健康检查应返回
-   `{"ok":true,"groups":8,"region":"hkg1","store":"redis",...}`。
+   `{"ok":true,"groups":10,"region":"hkg1","store":"redis",...}`。
 
 ### C. Railway / Docker
 
@@ -299,7 +299,7 @@ cube-math/
 ├── api/                           Vercel 函数：state / events / healthz / groups
 ├── public/
 │   ├── index.html                 学生端（首页选组 + 工作区）
-│   ├── teacher.html               教师端（8 宫格 + 可编辑放大演示）
+│   ├── teacher.html               教师端（10 宫格 + 可编辑放大演示）
 │   ├── config.js                  运行时配置（apiBase / pollMs）
 │   ├── css/style.css              配色、任务栏、平板/大屏适配
 │   ├── js/shared/model.js         ★ 坐标、三视图投影、校验、三个任务的初始图形
@@ -309,7 +309,7 @@ cube-math/
 │   ├── js/student/views.js        三视图方格图（学生端与演示共用）
 │   ├── js/student/app.js          选组、三个任务、自动保存
 │   ├── js/teacher/mini.js         教师卡片 / 演示用的 3D
-│   ├── js/teacher/app.js          8 宫格 + 放大演示（可编辑）
+│   ├── js/teacher/app.js          10 宫格 + 放大演示（可编辑）
 │   └── vendor/                    本地 three.js（断网可用）
 ├── scripts/
 │   ├── browser.mjs                跨电脑加载 playwright-core / 找浏览器
